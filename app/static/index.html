@@ -996,7 +996,12 @@ https://video-downloader-tool-5ffe.onrender.com</div>
               if (j.download_url) {
                 var a = document.createElement("a");
                 a.className = "dl-big";
-                a.href = apiBase() + encodeURI(j.download_url);
+                // Only encode the filename, with encodeURIComponent:
+                // encodeURI() leaves "#" intact, so a title containing "#"
+                // (e.g. "...称_#.mp4") was cut off as a URL fragment,
+                // the server received a truncated name, returned 404 JSON,
+                // and the browser saved that JSON as a .json file.
+                a.href = apiBase() + "/files/" + encodeURIComponent(j.file || j.download_url.replace(/^\/files\//, ""));
                 a.setAttribute("download", "");
                 a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>';
                 a.appendChild(document.createTextNode("保存视频：" + (j.file || "video.mp4")));

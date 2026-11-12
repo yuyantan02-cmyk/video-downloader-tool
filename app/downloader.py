@@ -42,7 +42,9 @@ def _yt_dlp_cmd() -> list[str]:
 
 
 def _safe_filename(name: str, max_len: int = 80) -> str:
-    name = re.sub(r'[\\/:*?"<>|]+', "_", name or "video").strip()
+    # "#" must be stripped too: it starts a URL fragment, so a filename
+    # containing it can never be requested intact by a browser.
+    name = re.sub(r'[\\/:*?"<>|#]+', "_", name or "video").strip()
     name = re.sub(r"\s+", "_", name)
     # Collapse runs of dots ("..." from truncated titles) so the
     # resulting filename never contains "..".
