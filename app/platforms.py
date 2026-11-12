@@ -26,9 +26,10 @@ PLATFORMS = [
     ], "Public posts/reels only. Login-walled content is refused."),
     ("facebook", "Facebook", [
         r"facebook\.com/.*/(videos|reel|watch)",
+        r"facebook\.com/share/",
         r"fb\.watch/",
         r"fb\.com/",
-    ], "Public videos only."),
+    ], "Public videos only; Facebook often requires login to view video details from a server IP."),
     ("x", "X", [
         r"(twitter|x)\.com/[^/]+/status/\d+",
         r"t\.co/",
@@ -41,16 +42,16 @@ PLATFORMS = [
         r"douyin\.com/video/\d+",
         r"v\.douyin\.com/",
         r"iesdouyin\.com/",
-    ], "MVP: via yt-dlp only. Dedicated extractor is a Phase 2 item."),
+    ], "抖音要浏览器验证 cookie 才能拿到视频地址，工具不登录、不存 cookie，所以取不到；请用抖音 App 官方保存/导出。"),
     ("xiaohongshu", "小红书", [
         r"xiaohongshu\.com/",
         r"xhslink\.com/",
         r"xhslink\.cn/",
-    ], "MVP: via yt-dlp only. Dedicated extractor is a Phase 2 item."),
+    ], "有 yt-dlp 提取器，但小红书常对服务器 IP 回“笔记暂时无法浏览”，要登录/验证；带 xsec_token 的完整分享链接成功率更高。"),
     ("wechat", "微信视频号", [
         r"weixin\.qq\.com/sph/",
         r"channels\.weixin\.qq\.com/",
-    ], "Requires the owner's own login in the official client. MVP does not fetch it; use official export."),
+    ], "要登录后的 token 才能拿到视频地址，工具不登录所以取不到；请用微信 / 视频号助手官方导出。"),
     ("bilibili", "Bilibili", [
         r"bilibili\.com/video/",
         r"b23\.tv/",
@@ -58,7 +59,7 @@ PLATFORMS = [
     ("kuaishou", "快手", [
         r"kuaishou\.com/",
         r"v\.kuaishou\.com/",
-    ], "MVP: via yt-dlp only."),
+    ], "专用解析：手机分享页里直接给无水印 MP4 直链，不用登录。"),
 ]
 
 _GENERIC_PATTERNS = [
