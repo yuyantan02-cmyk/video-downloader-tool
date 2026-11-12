@@ -137,7 +137,7 @@ XIAOHONGSHU_MSG = (
 
 
 YOUTUBE_BOT_MSG = (
-    "YouTube 判定这次请求是机器人，要求登录验证，工具不登录所以取不到。"
+    "YouTube 这次没给到可用的视频流，通常是机器人验证拦住了，工具不登录所以取不到。"
     "换个时间再试一次；自己的视频请用 YouTube Studio 导出。"
 )
 
@@ -161,7 +161,11 @@ def _explain_failure(url: str, tail: str) -> str:
         return XIAOHONGSHU_MSG
     if key == "bilibili" and "567" in lowered:
         return "B站的下载链接偶尔会被它的 CDN 拒绝（HTTP 567），不是这条视频的问题，重新点一次下载一般就好了。"
-    if key == "youtube" and "not a bot" in lowered:
+    if key == "youtube" and (
+        "not a bot" in lowered
+        or "failed to extract any player response" in lowered
+        or "requested format is not available" in lowered
+    ):
         return YOUTUBE_BOT_MSG
     if key == "facebook" and ("registered users" in lowered or "cannot parse data" in lowered):
         return FACEBOOK_MSG
@@ -224,7 +228,7 @@ def get_info(url: str) -> dict:
     # One retry: Bilibili / X sometimes fail a first fetch with a bare
     # read timeout and succeed immediately on the second attempt.
     result = None
-    android_client = False
+    player_client = None
     for _attempt in range(2):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode == 0:
@@ -233,18 +237,20 @@ def get_info(url: str) -> dict:
         if "timed out" not in tail and "timeout" not in tail:
             break
     assert result is not None
-    # YouTube bot check: the web player client gets "Sign in to confirm
-    # you're not a bot" from datacenter IPs. The Android player client
-    # is not subject to that web check and usually returns the video.
-    # Only used as a fallback, so normal videos keep the web client
-    # (best quality).
+    # YouTube bot check: the web player client is regularly blocked
+    # from datacenter IPs, and the error text keeps changing
+    # ("Sign in to confirm you're not a bot", "Requested format is
+    # not available", "Failed to extract any player response").
+    # So on ANY web-client failure, walk the other player clients
+    # (android usually works for Shorts; tv/ios are further fallbacks)
+    # instead of matching one exact error string.
     if result.returncode != 0 and key == "youtube":
-        tail0 = ((result.stderr or "").strip().splitlines() or [""])[-1].lower()
-        if "not a bot" in tail0:
-            android_cmd = cmd + ["--extractor-args", "youtube:player_client=android"]
-            result = subprocess.run(android_cmd, capture_output=True, text=True, timeout=120)
+        for client in ("android", "tv", "ios"):
+            client_cmd = cmd + ["--extractor-args", f"youtube:player_client={client}"]
+            result = subprocess.run(client_cmd, capture_output=True, text=True, timeout=120)
             if result.returncode == 0:
-                android_client = True
+                player_client = client
+                break
     if result.returncode != 0:
         msg = (result.stderr or "").strip().splitlines()
         tail = msg[-1] if msg else "解析失败"
@@ -292,9 +298,9 @@ def get_info(url: str) -> dict:
         "formats": formats[:12],
         "thumbnail": info.get("thumbnail"),
         "description": (info.get("description") or "")[:500],
-        # Internal: the YouTube Android player client was needed to pass
-        # the bot check; download() must use the same client.
-        "_android_client": android_client,
+        # Internal: the YouTube player client that worked (web needs
+        # none); download() must use the same client.
+        "_player_client": player_client,
     }
 
 
@@ -433,11 +439,14 @@ def _build_download_cmd(info: dict, platform: dict, quality: str, base: str, cle
     # source (preference -1 vs -2 for watermarked). There is no
     # --no-watermark option in yt-dlp; passing it aborts every TikTok
     # download with "no such option", so nothing is added here.
-    # YouTube: when the web player client hit the bot check, get_info()
-    # fell back to the Android player client; the download must use
+    # YouTube: when the web player client was blocked, get_info()
+    # fell back to another player client; the download must use
     # the same client or it hits the same wall.
-    if info.get("_android_client"):
-        cmd += ["--extractor-args", "youtube:player_client=android"]
+    player_client = info.get("_player_client") or (
+        "android" if info.get("_android_client") else None
+    )
+    if player_client:
+        cmd += ["--extractor-args", f"youtube:player_client={player_client}"]
     cmd.append(clean_url)
     return cmd
 

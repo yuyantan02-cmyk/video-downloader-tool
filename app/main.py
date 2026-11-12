@@ -43,7 +43,11 @@ class DownloadRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "version": "0.1.0"}
+    try:
+        from yt_dlp.version import __version__ as ytdlp_version
+    except Exception:
+        ytdlp_version = None
+    return {"ok": True, "version": "0.1.0", "yt_dlp": ytdlp_version}
 
 
 @app.post("/api/parse")
