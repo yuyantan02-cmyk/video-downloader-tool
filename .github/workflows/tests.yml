@@ -1,0 +1,24 @@
+name: Regression tests
+on: [push, pull_request]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - run: docker build -t downloader-check .
+      - name: Container dependencies and service health
+        run: |
+          docker run -d --name downloader-check -p 127.0.0.1:8000:8000 downloader-check
+          trap 'docker logs downloader-check; docker rm -f downloader-check' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail -s http://127.0.0.1:8000/health > /tmp/health.json; then break; fi
+            sleep 1
+          done
+          python -c 'import json; assert json.load(open("/tmp/health.json"))["ready"]'

@@ -3,8 +3,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -r
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-RUN mkdir -p downloads
+RUN useradd --create-home --uid 10001 app && mkdir -p downloads && chown app:app downloads
+COPY --chown=app:app . .
+USER app
 EXPOSE 8000
 # Render sets $PORT at runtime; fall back to 8000 locally.
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1 --no-access-log"]

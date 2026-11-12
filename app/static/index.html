@@ -371,8 +371,8 @@
 
       <!-- ================= 工具 ================= -->
       <div class="hero">
-        <h1>粘贴视频链接，<br />拿回<span class="hl">原画质</span>的视频文件</h1>
-        <p>把任意平台的分享链接贴进来 —— <b>TikTok、X、Instagram、快手</b>都行。工具只取平台本来就存着的干净源流，不涂抹、不做 AI 去水印；水印如果已经烧进原片，会如实保留并告诉你。</p>
+        <h1>粘贴视频链接，<br />保存<span class="hl">可用高清</span>的视频文件</h1>
+        <p>粘贴视频分享链接，尝试获取平台公开可访问的视频流。七个目标平台逐项适配，微信视频号通用下载仍受限；仅限本人、授权或平台明确允许下载的内容。工具不去除水印，水印状态默认未验证。</p>
       </div>
 
       <div class="tool" id="tool">
@@ -413,7 +413,7 @@
               <button type="button" data-quality="1080p" aria-pressed="false">≤ 1080p</button>
               <button type="button" data-quality="720p" aria-pressed="false">≤ 720p</button>
             </div>
-            <div class="seg-hint">最高画质 = 平台给的上限。</div>
+            <div class="seg-hint">最高画质 = 当前可公开获取的上限，不放大视频。快手直链暂仅支持最高档。</div>
           </div>
           <div>
             <span class="group-label">下载确认</span>
@@ -493,18 +493,18 @@ https://video-downloader-tool-5ffe.onrender.com</div>
       <!-- ================= 支持平台 ================= -->
       <section class="block">
         <h2>支持的平台</h2>
-        <p class="lede">按实际能下到的程度标的，不按宣传标：核心档走 yt-dlp 最稳；快手是专用解析取直链。</p>
+        <p class="lede">下列是解析适配范围，不代表全部已通过真实下载验收。各平台可用性受链接、地区、网络和访问权限影响。</p>
         <div class="plat-grid" id="platGrid"></div>
       </section>
 
       <!-- ================= 工作原理 ================= -->
       <section class="block">
-        <h2>它是怎么拿到「无水印原画质」的</h2>
-        <p class="lede">没有擦除、没有修复、没有 AI 补画。原理是平台服务器上本来就存着两份：你在 App 里点「保存」拿到的是盖了水印的那份，工具去取的是没盖水印的源文件那份。</p>
+        <h2>它是怎样保存视频的</h2>
+        <p class="lede">仅获取公开可访问的视频流，不擦除水印，不修改画面或作者标识。平台是否提供无水印源因视频而异；未经逐文件检查，一律显示「未验证」。云端使用时，文件先暂存在服务器，默认一小时后清理。</p>
         <div class="steps">
           <div class="step"><div class="num">01</div><h3>识别链接</h3><p>从整段分享文案里挑出真正的链接，按域名判断是哪个平台，短链也认。</p></div>
           <div class="step"><div class="num">02</div><h3>实时解析</h3><p>后端用 yt-dlp 现查这个视频的全部画质档位。必须现查 —— 播放地址带签名，缓存的旧地址很快过期。</p></div>
-          <div class="step"><div class="num">03</div><h3>取干净源流</h3><p>默认选最高一档；TikTok 明确向平台要无水印源流。</p></div>
+          <div class="step"><div class="num">03</div><h3>保存可用源流</h3><p>按所选画质获取可用流，不放大或裁剪画面；需要时无损合并音视频。</p></div>
           <div class="step"><div class="num">04</div><h3>校验并附出处</h3><p>下完校验文件完整性，旁边生成一个同名 .json，记着标题、作者和原链接，署名不丢。</p></div>
         </div>
       </section>
@@ -518,11 +518,11 @@ https://video-downloader-tool-5ffe.onrender.com</div>
         </details>
         <details class="faq">
           <summary>下完发现画质只有 720p，是被压缩了吗？</summary>
-          <p>不是。工具拿的就是平台给的最高一档，很多平台的视频本身最高就是 720p 或 1080p，「原画质」指的是相对 App 保存版不打折扣，不是能凭空变出 4K。先点「解析看看」，格式列表里列出的就是这个视频真实存在的全部档位。</p>
+          <p>工具不会放大视频。当前网络和访问权限下可获取的最高档，可能低于平台登录后的画质。格式列表最多展示 12 项，最终文件分辨率以下载后的实际检测值为准。</p>
         </details>
         <details class="faq">
           <summary>提示「需要登录 / 私密内容」怎么办？</summary>
-          <p>说明这个视频是私密的、要登录才能看，或者有年龄 / DRM 限制。工具不登录任何账号、不存 Cookie，这类内容会直接拒绝。你自己的作品遇到这种情况，用平台官方的导出功能拿原文件最稳妥。</p>
+          <p>说明这个视频是私密的、要登录才能看，或者有年龄 / DRM 限制。工具不登录账号、不导入或持久保存账号 Cookie，这类内容会直接拒绝。你自己的作品遇到这种情况，用平台官方的导出功能拿原文件最稳妥。</p>
         </details>
         <details class="faq">
           <summary>下回来的视频怎么还有水印？</summary>
@@ -530,7 +530,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
         </details>
         <details class="faq">
           <summary>昨天还能解析，今天突然失败了？</summary>
-          <p>大概率是平台又改接口了，这是这类工具最常见的故障。先在后端环境里运行 <code>pip install -U yt-dlp</code> 升级解析引擎，多数情况就恢复了；个别平台偶尔要等专用解析器更新。</p>
+          <p>大概率是平台又改接口了，这是这类工具最常见的故障。请先记录错误类型，可能是网络、验证、内容不可访问或解析器变化。维护者需要同步验证 yt-dlp、EJS 与运行环境；公网网站用户无需安装 Python。</p>
         </details>
       </section>
 
@@ -552,19 +552,140 @@ https://video-downloader-tool-5ffe.onrender.com</div>
 
         /* ---------- 平台数据（与后端 app/platforms.py 保持一致） ---------- */
         var PLATFORMS = [
-          { key: "tiktok", name: "TikTok", color: "#161823", tier: "stable", tierLabel: "核心支持",
-            patterns: [/tiktok\.com\/@[^/]+\/video\/\d+/i, /tiktok\.com\/t\//i, /vt\.tiktok\.com\//i, /vm\.tiktok\.com\//i],
-            note: "会明确向平台要无水印的干净源流。" },
-          { key: "instagram", name: "Instagram", color: "#e1306c", tier: "stable", tierLabel: "核心支持",
-            patterns: [/instagram\.com\/(reel|reels|p|stories)\//i, /instagr\.am\//i],
-            note: "仅公开帖子 / Reels，需登录的会拒绝。" },
-          { key: "x", name: "X", color: "#000000", tier: "stable", tierLabel: "核心支持",
-            patterns: [/(twitter|x)\.com\/[^/]+\/status\/\d+/i, /t\.co\//i],
-            note: "仅公开帖子里的视频。" },
-          { key: "kuaishou", name: "快手", color: "#ff4906", tier: "stable", tierLabel: "专用解析",
-            patterns: [/kuaishou\.com\//i, /v\.kuaishou\.com\//i],
-            note: "专用解析取直链，不用登录。" }
-        ];
+  {
+    "key": "douyin",
+    "name": "抖音",
+    "hosts": [
+      "douyin.com",
+      "iesdouyin.com"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "facebook",
+    "name": "Facebook",
+    "hosts": [
+      "facebook.com",
+      "fb.watch",
+      "fb.com"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "youtube",
+    "name": "YouTube",
+    "hosts": [
+      "youtube.com",
+      "youtu.be"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "threads",
+    "name": "Threads",
+    "hosts": [
+      "threads.net",
+      "threads.com"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "bilibili",
+    "name": "Bilibili",
+    "hosts": [
+      "bilibili.com",
+      "b23.tv"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "xiaohongshu",
+    "name": "小红书",
+    "hosts": [
+      "xiaohongshu.com",
+      "xhslink.com",
+      "xhslink.cn"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "wechat",
+    "name": "微信视频号",
+    "hosts": [
+      "weixin.qq.com"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "通用下载受限，请检查官方授权导出。"
+  },
+  {
+    "key": "tiktok",
+    "name": "TikTok",
+    "hosts": [
+      "tiktok.com"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "x",
+    "name": "X",
+    "hosts": [
+      "twitter.com",
+      "x.com",
+      "t.co"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "instagram",
+    "name": "Instagram",
+    "hosts": [
+      "instagram.com",
+      "instagr.am"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  },
+  {
+    "key": "kuaishou",
+    "name": "快手",
+    "hosts": [
+      "kuaishou.com",
+      "chenzhongtech.com"
+    ],
+    "color": "#161823",
+    "tier": "limited",
+    "tierLabel": "待实测",
+    "note": "仅尝试公开可访问视频；水印状态未验证。"
+  }
+];
 
         function extractUrl(text) {
           if (!text) return null;
@@ -573,14 +694,12 @@ https://video-downloader-tool-5ffe.onrender.com</div>
           return m[0].replace(/[.,;!?)]+$/, "");
         }
         function detectPlatform(url) {
-          if (!url) return null;
-          for (var i = 0; i < PLATFORMS.length; i++) {
-            var p = PLATFORMS[i];
-            for (var j = 0; j < p.patterns.length; j++) {
-              if (p.patterns[j].test(url)) return p;
-            }
-          }
-          return null;
+          try {
+            var host = new URL(url).hostname.toLowerCase();
+            return PLATFORMS.find(function (p) {
+              return p.hosts.some(function (domain) { return host === domain || host.endsWith("." + domain); });
+            }) || null;
+          } catch(e) { return null; }
         }
 
         /* ---------- 元素 ---------- */
@@ -675,7 +794,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
           else whyDisabled.textContent = "可以下载了。若后端还没启动，下载会提示连不上，按下方 A 的步骤启动即可。";
 
           cliOut.textContent = state.url
-            ? 'python cli.py "' + state.url + '" --confirm --quality ' + state.quality
+            ? "python cli.py '" + state.url + "' --confirm --quality " + state.quality
             : 'python cli.py "（先在上面粘贴一个链接）" --confirm --quality best';
         }
 
@@ -771,7 +890,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
-          }, 30000).then(function (r) {
+          }, path === "/api/download" ? 615000 : 135000).then(function (r) {
             return r.json().catch(function () { return {}; }).then(function (j) {
               if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
               return j;
@@ -780,8 +899,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
         }
         function backendUnreachableMsg(action) {
           return action + "没成功：连不上后端 " + apiBase() + "。" +
-            "最常见的原因是后端还没在你电脑上启动（127.0.0.1 指的是你自己的电脑）。" +
-            "按下方「在自己电脑上启动」的四行命令跑起来，再点一次「检测连接」确认变绿即可。";
+            "可能是网络中断、服务唤醒或等待超时。请检测连接；云端用户无需安装 Python。服务器任务有时间和并发上限，请勿连续重复提交。";
         }
         function setStatus(kind, text) {
           statusDot.className = "status-dot" + (kind ? " " + kind : "");
@@ -789,12 +907,12 @@ https://video-downloader-tool-5ffe.onrender.com</div>
         }
         function checkHealth(silent) {
           if (!silent) setStatus("busy", "正在检测 " + apiBase() + " …");
-          return fetchWithTimeout(apiBase() + "/health", { method: "GET" }, 4000)
+          return fetchWithTimeout(apiBase() + "/health", { method: "GET" }, 70000)
             .then(function (r) { return r.json(); })
             .then(function (j) {
               if (j && j.ok) {
                 state.backendOk = true;
-                setStatus("ok", "后端已连接（版本 " + (j.version || "?") + "），可以解析和下载了。");
+                setStatus(j.ready === false ? "bad" : "ok", "后端已连接（版本 " + (j.version || "?") + "）" + (j.ready === false ? "，服务器视频依赖尚未就绪。" : "，平台可用性以实际解析为准。"));
               } else {
                 state.backendOk = false;
                 setStatus("bad", "这个地址有回应，但不像是下载器后端。确认一下地址填对了没有。");
@@ -884,12 +1002,21 @@ https://video-downloader-tool-5ffe.onrender.com</div>
               var h = document.createElement("h3");
               h.textContent = "解析成功";
               box.appendChild(h);
+              if (info.thumbnail && /^https?:\/\//i.test(info.thumbnail)) {
+                var cover = document.createElement("img");
+                cover.src = info.thumbnail; cover.alt = "视频封面";
+                cover.referrerPolicy = "no-referrer"; cover.loading = "lazy";
+                cover.style.cssText = "max-width:100%;max-height:240px;object-fit:contain;border-radius:12px;margin:12px 0";
+                box.appendChild(cover);
+              }
               var grid = document.createElement("div");
               grid.className = "meta-grid";
               grid.appendChild(metaItem("标题", info.title));
               grid.appendChild(metaItem("作者", info.uploader));
               grid.appendChild(metaItem("平台", (j.platform && j.platform.name) || "—"));
               grid.appendChild(metaItem("时长", fmtDuration(info.duration)));
+              grid.appendChild(metaItem("水印状态", info.watermark_label || "未验证"));
+              if (info.selection_note) grid.appendChild(metaItem("视频选择", info.selection_note));
               grid.appendChild(metaItem("最高分辨率", (info.width && info.height) ? (info.width + " × " + info.height) : "—"));
               box.appendChild(grid);
 
@@ -959,6 +1086,13 @@ https://video-downloader-tool-5ffe.onrender.com</div>
               grid.appendChild(metaItem("标题", j.title));
               grid.appendChild(metaItem("作者", j.uploader));
               grid.appendChild(metaItem("文件大小", fmtSize(j.bytes)));
+              grid.appendChild(metaItem("水印状态", j.watermark_label || "未验证"));
+              if (j.info) {
+                grid.appendChild(metaItem("实际分辨率", j.info.width + " × " + j.info.height));
+                grid.appendChild(metaItem("实际时长", fmtDuration(j.info.duration)));
+                grid.appendChild(metaItem("实际格式与编码", [j.info.ext, j.info.vcodec, j.info.acodec].filter(Boolean).join(" / ")));
+                grid.appendChild(metaItem("音频", j.info.has_audio ? "包含音频流（完整性需播放确认）" : "未检测到音频流"));
+              }
               grid.appendChild(metaItem("出处记录", j.metadata_file || "—"));
               box.appendChild(grid);
               if (j.watermark_note) {
@@ -974,11 +1108,19 @@ https://video-downloader-tool-5ffe.onrender.com</div>
                 // (e.g. "...称_#.mp4") was cut off as a URL fragment,
                 // the server received a truncated name, returned 404 JSON,
                 // and the browser saved that JSON as a .json file.
-                a.href = apiBase() + "/files/" + encodeURIComponent(j.file || j.download_url.replace(/^\/files\//, ""));
+                a.href = apiBase() + j.download_url;
                 a.setAttribute("download", "");
                 a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>';
                 a.appendChild(document.createTextNode("保存视频：" + (j.file || "video.mp4")));
                 box.appendChild(a);
+                if (j.metadata_url) {
+                  var provenance = document.createElement("a");
+                  provenance.href = apiBase() + j.metadata_url;
+                  provenance.textContent = "保存出处记录（JSON）";
+                  provenance.style.display = "block";
+                  provenance.style.marginTop = "12px";
+                  box.appendChild(provenance);
+                }
               }
             })
             .catch(function (e) {
@@ -994,6 +1136,14 @@ https://video-downloader-tool-5ffe.onrender.com</div>
         /* ---------- 初始化 ---------- */
         refresh();
         checkHealth(true);
+        fetch(apiBase() + "/api/platforms").then(function (r) { return r.json(); }).then(function (platforms) {
+          if (Array.isArray(platforms)) {
+            PLATFORMS = platforms.map(function (p) {
+              return {key:p.key, name:p.name, hosts:p.hosts, color:"#161823", tier:"limited", tierLabel:p.status === "official_export_required" ? "官方导出" : "待实测", note:p.notes};
+            });
+            refresh();
+          }
+        }).catch(function () {});
       })();
     </script>
   </body>

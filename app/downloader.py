@@ -1,71 +1,84 @@
-"""Download engine built on yt-dlp.
-
-Compliance model (see COMPLIANCE.md):
-- Only the URL the user pastes is fetched. No account login, no cookies,
-  no credential storage, no scraping of profiles / followers / comments.
-- No watermark is painted over or AI-inpainted. We ask yt-dlp for the
-  best available source stream; when the platform supplies a clean
-  (no-watermark) source, that is what is returned. When the watermark
-  is baked into the upload itself, the file is returned as-is and the
-  fact is reported — we do not attempt to remove it.
-- Author / title / source URL are always saved alongside the video so
-  attribution is preserved.
-- Private, login-walled, age-restricted and DRM-protected items are
-  refused with a clear error. Use the platform's official export for
-  your own content in those cases.
-"""
+"""Shared, bounded download lifecycle for the existing API and CLI."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
 import re
+import secrets
 import shutil
+import signal
 import subprocess
 import sys
-import urllib.request
+import tempfile
+import threading
+import time
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .platforms import detect_platform, extract_url
 
-DOWNLOADS_DIR = Path(__file__).resolve().parent.parent / "downloads"
+DOWNLOADS_DIR = Path(__file__).resolve().parent.parent / 'downloads'
+MAX_BYTES = int(os.getenv('MAX_DOWNLOAD_BYTES', str(512 * 1024 * 1024)))
+FILE_TTL = int(os.getenv('DOWNLOAD_TTL_SECONDS', '3600'))
+DOWNLOAD_TIMEOUT = int(os.getenv('DOWNLOAD_TIMEOUT_SECONDS', '600'))
+PARSE_TIMEOUT = int(os.getenv('PARSE_TIMEOUT_SECONDS', '120'))
+_TASK_SLOT = threading.BoundedSemaphore(1)
+_FILE_KEY = secrets.token_bytes(32)
+MAX_WORKER_MEMORY = int(os.getenv('MAX_WORKER_MEMORY_MB', '320')) * 1024 * 1024
+WATERMARK_LABELS = {'verified_clean': '已验证无水印', 'verified_watermarked': '已验证带水印', 'unverified': '未验证'}
 
-_BROWSER_UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
-)
+_MESSAGES = {
+    'verification_required': '平台要求访问验证；本工具不会生成验证凭证或绕过验证。',
+    'login_required': '平台要求登录；请使用平台官方允许的保存或导出方式。',
+    'private': '内容不是可公开访问的视频，拒绝下载。',
+    'restricted': '内容有年龄、付费或 DRM 限制，拒绝下载。',
+    'unavailable': '视频不存在、已删除或当前不可访问。',
+    'unsupported': '当前解析器暂不支持这个链接或页面结构。',
+    'network_error': '服务器连接平台失败或超时；这不代表链接错误或视频私密。',
+    'no_video': '没有可用的视频流；可能是图片帖子或平台未提供视频。',
+    'timeout': '平台响应或下载超过服务时间上限，请稍后重试。',
+    'busy': '服务器正在处理另一个任务，请稍后重试。',
+    'limit': '任务超过文件大小、临时空间或日志上限。',
+    'invalid_media': '下载结果未通过媒体完整性检查，未提供下载文件。',
+    'dependency_missing': '服务器缺少必要的视频处理依赖，请联系维护者。',
+    'unsafe_url': '链接或媒体跳转指向不允许的地址，已拒绝访问。',
+    'official_export_required': '微信视频号尚无本项目已确认可用的通用授权下载接口；请在官方客户端或视频号助手检查本人作品可用的导出功能。',
+}
 
 
-def _resolve_redirect(url: str, timeout: int = 20) -> str:
-    """Follow a short link to its final URL (best-effort, no login).
-
-    Used for xhslink.com share links, which yt-dlp's Xiaohongshu
-    extractor does not match directly: it only matches
-    www.xiaohongshu.com/explore/<id>. On any failure the original
-    URL is returned unchanged.
-    """
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": _BROWSER_UA}, method="HEAD")
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.geturl()
-    except Exception:
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": _BROWSER_UA})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                return resp.geturl()
-        except Exception:
-            return url
+class DownloadError(RuntimeError):
+    def __init__(self, code, detail=None):
+        self.code = code
+        # Never return upstream URLs, cookies, signed CDN links or stderr.
+        super().__init__(_MESSAGES.get(code, '解析或下载失败，请稍后重试。'))
 
 
-def _yt_dlp_cmd() -> list[str]:
-    """Return a working yt-dlp invocation.
+def explain_failure(message):
+    text = re.sub(r'https?://[^\s\x22\x27<>]+', '', str(message).lower())
+    groups = [
+        ('unsafe_url', ('内网', '拒绝访问', '不允许的媒体地址', '只允许 http', '不允许访问本机')),
+        ('restricted', ('drm', 'premium', 'paywall', 'members-only', 'age-restricted', 'age restricted', 'age_limit')),
+        ('private', ('private', 'not public')),
+        ('verification_required', ('fresh cookies', 'captcha', 'verification', 'not a bot', 'challenge', 'checkpoint', '429')),
+        ('login_required', ('login', 'log in', 'sign in', 'registered users', 'cookies')),
+        ('unavailable', ('404', '410', 'unavailable', 'deleted', 'not found')),
+        ('no_video', ('no_video', 'no video formats', 'no formats')),
+        ('unsupported', ('unsupported', 'unable to extract', 'cannot parse', 'no suitable extractor')),
+        ('network_error', ('timeout', 'timed out', 'connection', 'network', '403', '567', 'http error', 'urlerror', 'ssl')),
+    ]
+    for code, markers in groups:
+        if any(marker in text for marker in markers):
+            return DownloadError(code)
+    return DownloadError('unsupported')
 
-    Prefers the `yt-dlp` binary on PATH, otherwise runs the installed
-    Python package with the current interpreter (works inside a venv
-    where the binary is not on PATH).
-    """
-    binary = shutil.which("yt-dlp")
-    if binary:
-        return [binary]
-    return [sys.executable, "-m", "yt_dlp"]
+
+def source_url(url):
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+             if not re.search(r'token|sig|pkey|auth|cookie|credential', k, re.I)]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ''))
 
 
 _EMOJI_RE = re.compile(r"[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200D]+")
@@ -93,413 +106,157 @@ def _safe_filename(name: str, max_len: int = 80) -> str:
     return name.strip("_").strip(".") or "video"
 
 
-def parse_url(raw_text: str) -> dict:
-    """Validate a pasted link and return platform + clean URL.
 
-    Raises ValueError with a user-facing message on bad input.
-    """
-    url = extract_url(raw_text or "")
+def parse_url(raw_text):
+    url = extract_url(raw_text or '')
     if not url:
-        raise ValueError("没有找到有效的视频链接，请粘贴完整的分享链接。")
+        raise ValueError('没有找到有效的视频链接，请粘贴完整的分享链接。')
     platform = detect_platform(url)
-    if platform is None:
-        raise ValueError("暂不支持这个链接的平台。MVP 支持：YouTube、TikTok、Instagram、Facebook、X、Threads、抖音、小红书、微信视频号（仅提示）、Bilibili、快手。")
-    # xhslink.com short links: resolve to the www.xiaohongshu.com/explore/<id>
-    # page so yt-dlp's Xiaohongshu extractor matches it (and so any
-    # xsec_token in the share link is carried to the real page).
-    if platform["key"] == "xiaohongshu" and "xhslink.com" in url:
-        url = _resolve_redirect(url)
-        platform = detect_platform(url) or platform
-    return {"url": url, "platform": platform}
+    if not platform:
+        raise ValueError('暂不支持这个平台或链接格式，请使用视频的完整分享链接。')
+    return {'url': url, 'platform': platform}
 
 
-DOUYIN_COOKIE_MSG = (
-    "抖音现在要浏览器先跑验证才能拿到视频地址：它先发一段验证用的 JS，"
-    "只有真浏览器跑完、拿到验证 cookie 之后，接口才给视频地址。"
-    "yt-dlp 也明确提示需要 fresh cookies，而且做不了这步验证。"
-    "工具按不登录、不存 cookie 的规矩取不到——不是这条视频私密，也不是链接错了。"
-    "请用抖音 App 官方的办法：自己发的去创作者中心导出原视频，"
-    "别人发的公开视频点分享 → 保存本地（作者允许下载的才有这个选项）。"
-)
-
-WECHAT_MSG = (
-    "微信视频号要登录后的 token 才能拿到视频地址，工具不登录所以取不到。"
-    "自己发的视频请用微信 App / 视频号助手里的官方导出；"
-    "别人发的公开视频，请在微信里直接保存（作者允许保存的才有这个选项）。"
-)
-
-XIAOHONGSHU_MSG = (
-    "小红书这条笔记现在打不开：服务器回的是“当前笔记暂时无法浏览”，"
-    "从服务器 IP 看要登录/验证才能看笔记详情，工具按不登录、不存 cookie "
-    "的规矩取不到。不是链接错了。请试试用 App 里复制的、带 xsec_token 的"
-    "完整分享链接再粘贴一次，或直接在小红书 App 里保存这条视频。"
-)
-
-
-YOUTUBE_BOT_MSG = (
-    "YouTube 这次没给到可用的视频流，通常是机器人验证拦住了，工具不登录所以取不到。"
-    "换个时间再试一次；自己的视频请用 YouTube Studio 导出。"
-)
-
-FACEBOOK_MSG = (
-    "Facebook 这条视频在服务器上打不开：Facebook 要求登录账号才能看视频详情，"
-    "哪怕是公开视频也一样，工具不登录所以取不到。请用 Facebook App 里官方的"
-    "保存/下载（自己的视频在 Facebook 里有下载选项）。"
-)
-
-
-def _explain_failure(url: str, tail: str) -> str:
-    """Turn yt-dlp's last error line into a message the user can act on."""
-    lowered = tail.lower()
-    platform = detect_platform(url)
-    key = platform.get("key") if platform else None
-    if key == "douyin" and "cookies" in lowered:
-        return DOUYIN_COOKIE_MSG
-    if key == "wechat":
-        return WECHAT_MSG
-    if key == "xiaohongshu" and ("no video formats" in lowered or "404" in lowered):
-        return XIAOHONGSHU_MSG
-    if key == "bilibili" and "567" in lowered:
-        return "B站的下载链接偶尔会被它的 CDN 拒绝（HTTP 567），不是这条视频的问题，重新点一次下载一般就好了。"
-    if key == "youtube" and (
-        "not a bot" in lowered
-        or "failed to extract any player response" in lowered
-        or "requested format is not available" in lowered
-    ):
-        return YOUTUBE_BOT_MSG
-    if key == "facebook" and ("registered users" in lowered or "cannot parse data" in lowered):
-        return FACEBOOK_MSG
-    if any(k in lowered for k in ("login", "log in", "sign in", "private", "age", "cookies")):
-        return "这个视频需要登录 / 是私密内容，工具不会用账号去取。请用你本人在平台官方的导出功能。"
-    return f"解析失败：{tail}"
-
-
-def get_info(url: str) -> dict:
-    """Fetch metadata + formats with yt-dlp without downloading.
-
-    Uses --dump-single-json so we never fetch media we do not need.
-    Kuaishou has no yt-dlp extractor, so it uses the dedicated
-    no-login resolver in app/kuaishou.py. WeChat Channels has no
-    no-login route at all, so it fails fast with a clear message
-    instead of wasting a yt-dlp call.
-    """
-    platform = detect_platform(url)
-    key = platform.get("key") if platform else None
-    if key == "wechat":
-        raise RuntimeError(WECHAT_MSG)
-    if key == "kuaishou":
-        from .kuaishou import resolve as resolve_kuaishou
-
-        ks = resolve_kuaishou(url)
-        return {
-            "id": ks["photo_id"],
-            "title": ks["title"],
-            "uploader": None,
-            "uploader_id": None,
-            "webpage_url": url,
-            "duration": None,
-            "width": None,
-            "height": None,
-            "ext": "mp4",
-            "formats": [{
-                "format_id": "direct",
-                "ext": "mp4",
-                "protocol": "https",
-                "width": None,
-                "height": None,
-                "fps": None,
-                "filesize": None,
-                "tbr": None,
-                "vcodec": None,
-                "acodec": None,
-                "note": "快手直链（无水印源）",
-            }],
-            "thumbnail": None,
-            "description": "",
-        }
-
-    cmd = _yt_dlp_cmd() + [
-        "--no-playlist",
-        "--no-warnings",
-        "--dump-single-json",
-        "--no-download",
-        url,
-    ]
-    # One retry: Bilibili / X sometimes fail a first fetch with a bare
-    # read timeout and succeed immediately on the second attempt.
-    result = None
-    player_client = None
-    for _attempt in range(2):
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        if result.returncode == 0:
-            break
-        tail = ((result.stderr or "").strip().splitlines() or [""])[-1].lower()
-        if "timed out" not in tail and "timeout" not in tail:
-            break
-    assert result is not None
-    # YouTube bot check: the web player client is regularly blocked
-    # from datacenter IPs, and the error text keeps changing
-    # ("Sign in to confirm you're not a bot", "Requested format is
-    # not available", "Failed to extract any player response").
-    # So on ANY web-client failure, walk the other player clients
-    # (android usually works for Shorts; tv/ios are further fallbacks)
-    # instead of matching one exact error string.
-    if result.returncode != 0 and key == "youtube":
-        for client in ("android", "tv", "ios"):
-            client_cmd = cmd + ["--extractor-args", f"youtube:player_client={client}"]
-            result = subprocess.run(client_cmd, capture_output=True, text=True, timeout=120)
-            if result.returncode == 0:
-                player_client = client
-                break
-    if result.returncode != 0:
-        msg = (result.stderr or "").strip().splitlines()
-        tail = msg[-1] if msg else "解析失败"
-        raise RuntimeError(_explain_failure(url, tail))
-
-    try:
-        info = json.loads(result.stdout)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(f"解析结果无法识别：{e}")
-
-    formats = []
-    for f in info.get("formats") or []:
-        # Audio-only formats have no video (height None). Combined
-        # direct files (e.g. X/Twitter http-25128) have vcodec/acodec
-        # unknown (None) but a height, and must be kept: they are the
-        # single-file alternative to a fragmented HLS stream.
-        if f.get("vcodec") in (None, "none") and f.get("height") is None:
-            continue
-        formats.append({
-            "format_id": f.get("format_id"),
-            "ext": f.get("ext"),
-            "protocol": f.get("protocol"),
-            "width": f.get("width"),
-            "height": f.get("height"),
-            "fps": f.get("fps"),
-            "filesize": f.get("filesize") or f.get("filesize_approx"),
-            "tbr": f.get("tbr"),
-            "vcodec": f.get("vcodec"),
-            "acodec": f.get("acodec"),
-            "note": f.get("format_note") or "",
-        })
-    # Best-first by height then bitrate.
-    formats.sort(key=lambda x: ((x["height"] or 0), (x["tbr"] or 0)), reverse=True)
-
-    return {
-        "id": info.get("id"),
-        "title": info.get("title"),
-        "uploader": info.get("uploader") or info.get("channel"),
-        "uploader_id": info.get("uploader_id") or info.get("channel_id"),
-        "webpage_url": info.get("webpage_url") or url,
-        "duration": info.get("duration"),
-        "width": info.get("width"),
-        "height": info.get("height"),
-        "ext": info.get("ext"),
-        "formats": formats[:12],
-        "thumbnail": info.get("thumbnail"),
-        "description": (info.get("description") or "")[:500],
-        # Internal: the YouTube player client that worked (web needs
-        # none); download() must use the same client.
-        "_player_client": player_client,
-    }
-
-
-def _finish_download(info: dict, platform: dict, clean_url: str, base: str) -> dict:
-    """Find the finished file, write the attribution sidecar, return the result."""
-    candidates = sorted(DOWNLOADS_DIR.glob(f"{base}.*"), key=lambda p: p.stat().st_mtime, reverse=True)
-    video_file = None
-    for cand in candidates:
-        if cand.suffix.lower() in (".mp4", ".mkv", ".webm") and cand.stat().st_size > 0:
-            video_file = cand
-            break
-    if video_file is None:
-        raise RuntimeError("下载已完成但没有找到视频文件。")
-
-    # Save attribution metadata next to the video. Never strip it.
-    meta = {
-        "title": info.get("title"),
-        "uploader": info.get("uploader"),
-        "uploader_id": info.get("uploader_id"),
-        "source_url": info.get("webpage_url") or clean_url,
-        "platform": platform,
-        "duration": info.get("duration"),
-        "width": info.get("width"),
-        "height": info.get("height"),
-        "file": video_file.name,
-        "bytes": video_file.stat().st_size,
-        "note": "仅限本人 / 授权 / 可公开下载内容使用，保留作者信息，勿二次分发。",
-    }
-    meta_path = video_file.with_suffix(".json")
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    return {
-        "file": video_file.name,
-        "path": str(video_file),
-        "bytes": video_file.stat().st_size,
-        "metadata_file": meta_path.name,
-        "info": info,
-        "platform": platform,
-        "watermark_note": "本工具只取平台提供的干净源流，不做涂抹 / AI 去水印。如果水印已烧进原片，文件会保留原样。",
-    }
-
-
-def _download_kuaishou_file(clean_url: str, info: dict, base: str) -> None:
-    """Download a Kuaishou video from its resolved direct MP4 URL.
-
-    The signed URL is short-lived, so it is resolved fresh here,
-    immediately before downloading.
-    """
-    from .kuaishou import MOBILE_UA, resolve as resolve_kuaishou
-
-    ks = resolve_kuaishou(clean_url)
-    dest = DOWNLOADS_DIR / f"{base}.mp4"
-    req = urllib.request.Request(ks["video_url"], headers={
-        "User-Agent": MOBILE_UA,
-        "Referer": f"https://v.m.chenzhongtech.com/fw/photo/{ks['photo_id']}",
-    })
-    try:
-        with urllib.request.urlopen(req, timeout=600) as resp, open(dest, "wb") as out:
-            while True:
-                chunk = resp.read(1024 * 1024)
-                if not chunk:
-                    break
-                out.write(chunk)
-    except Exception as e:
-        try:
-            dest.unlink()
-        except OSError:
-            pass
-        raise RuntimeError(f"下载失败：{e}")
-    if dest.stat().st_size == 0:
-        dest.unlink()
-        raise RuntimeError("下载失败：快手返回了空文件。")
-
-
-def _build_download_cmd(info: dict, platform: dict, quality: str, base: str, clean_url: str) -> list[str]:
-    """Pick the format and build the yt-dlp download command.
-
-    Separated out so the retry loop can rebuild it after re-running
-    get_info() — e.g. when the YouTube Android player client was only
-    detected as needed on the second extraction.
-    """
-    # Format choice.
-    # First try a direct combined https file at the requested quality:
-    # X/Twitter offers http-25128, a single 4K MP4, alongside
-    # hls-15468, ~54 HLS fragments whose signed segment URLs can
-    # expire mid-download and abort near the last fragment
-    # ("...part-Frag54" not found). A single file has no fragments
-    # to expire. Only use it when it reaches the requested height;
-    # otherwise (e.g. YouTube, where combined files top out at 360p)
-    # fall back to best video + best audio, merged to mp4.
-    cap = {"1080p": 1080, "720p": 720}.get(quality)
-    formats = info.get("formats") or []
-    max_h = max((f.get("height") or 0) for f in formats) if formats else 0
-    target_h = cap if cap is not None else max_h
-    direct = None
-    for f in formats:
-        if f.get("protocol") not in ("https", "http"):
-            continue
-        if (f.get("height") or 0) != target_h:
-            continue
-        if f.get("acodec") == "none":
-            continue  # video-only, not a combined file
-        direct = f
-        break
-    if direct is not None:
-        fmt = direct["format_id"]
-    elif quality == "1080p":
-        fmt = "bv*[height<=1080]+ba/b[height<=1080]"
-    elif quality == "720p":
-        fmt = "bv*[height<=720]+ba/b[height<=720]"
-    else:
-        fmt = "bv*+ba/b"
-
-    # Short on-disk name: 30 chars of title + full video id. The title
-    # stays in full in the .json sidecar and in the page, so nothing
-    # about attribution is lost; the file itself just stops being a
-    # 215-byte name that yt-dlp then extends with fragment suffixes.
-    out_tpl = str(DOWNLOADS_DIR / f"{base}.%(ext)s")
-
-    cmd = _yt_dlp_cmd() + [
-        "--no-playlist",
-        "--no-warnings",
-        "--no-overwrites",
-        "--merge-output-format", "mp4",
-        "-f", fmt,
-        # No --sleep-requests: for HLS that adds 1s per fragment
-        # (~54s for a 4-minute video), which is exactly the window in
-        # which signed segment URLs expire. Keep the rate limit only.
-        "--limit-rate", "10M",
-        "--fragment-retries", "10",
-        "--retries", "10",
-        "--hls-prefer-native",
-        "-o", out_tpl,
-    ]
-    # TikTok: yt-dlp's extractor already prefers the non-watermarked
-    # source (preference -1 vs -2 for watermarked). There is no
-    # --no-watermark option in yt-dlp; passing it aborts every TikTok
-    # download with "no such option", so nothing is added here.
-    # YouTube: when the web player client was blocked, get_info()
-    # fell back to another player client; the download must use
-    # the same client or it hits the same wall.
-    player_client = info.get("_player_client") or (
-        "android" if info.get("_android_client") else None
-    )
-    if player_client:
-        cmd += ["--extractor-args", f"youtube:player_client={player_client}"]
-    cmd.append(clean_url)
-    return cmd
-
-
-def download(url: str, confirmed: bool, quality: str = "best") -> dict:
-    """Download the best clean source stream for a URL.
-
-    ``confirmed`` must be True: the caller must have shown the user
-    the compliance checkbox and received their confirmation that this
-    is their own upload, authorised material, or public downloadable
-    content. Without it the download is refused.
-    """
-    if not confirmed:
-        raise ValueError("请先确认：这是你本人上传的内容，或已获得权利人授权，或属于可公开下载的内容，然后再下载。")
-
-    parsed = parse_url(url)
-    clean_url = parsed["url"]
-    platform = parsed["platform"]
+def cleanup_downloads():
     DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    for sidecar in DOWNLOADS_DIR.glob('*.json'):
+        try:
+            if sidecar.is_symlink() or sidecar.stat().st_size > 65536:
+                continue
+            meta = json.loads(sidecar.read_text(encoding='utf-8'))
+            filename = meta.get('file', '')
+            if (meta.get('managed_by') == 'social-video-downloader' and meta.get('expires_at')
+                    and meta['expires_at'] < time.time()
+                    and re.fullmatch(r'.+_[a-f0-9]{24}\.(mp4|mkv|webm)', filename)
+                    and sidecar.stem == Path(filename).stem):
+                (DOWNLOADS_DIR / filename).unlink(missing_ok=True)
+                sidecar.unlink(missing_ok=True)
+        except (OSError, ValueError, TypeError, AttributeError):
+            continue
+    tasks = DOWNLOADS_DIR / '.tasks'
+    if tasks.exists():
+        for path in tasks.iterdir():
+            try:
+                if not path.is_symlink() and path.is_dir() and path.stat().st_mtime < time.time() - DOWNLOAD_TIMEOUT - 60:
+                    shutil.rmtree(path)
+            except OSError:
+                continue
 
-    info = get_info(clean_url)
 
-    # Kuaishou has no yt-dlp extractor: download its resolved direct
-    # MP4 straight to disk, then share the normal finish step below.
-    base = f"{_safe_filename(info.get('title') or 'video', max_len=30)}_{info.get('id') or 'noid'}"
-    if platform["key"] == "kuaishou":
-        _download_kuaishou_file(clean_url, info, base)
-        return _finish_download(info, platform, clean_url, base)
+def _run_worker(mode, url, quality='best', directory=None):
+    if not _TASK_SLOT.acquire(blocking=False):
+        raise DownloadError('busy')
+    try:
+        cleanup_downloads()
+        payload = {'mode': mode, 'url': url, 'quality': quality,
+                   'directory': str(directory) if directory else None, 'max_bytes': MAX_BYTES}
+        timeout = PARSE_TIMEOUT if mode == 'info' else DOWNLOAD_TIMEOUT
+        # shortcut: one worker/instance; use shared admission control before scaling replicas.
+        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+            proc = subprocess.Popen([sys.executable, '-m', 'app.worker'], stdin=subprocess.PIPE,
+                                    stdout=out, stderr=err, cwd=Path(__file__).resolve().parent.parent,
+                                    start_new_session=os.name != 'nt')
+            try:
+                proc.stdin.write(json.dumps(payload).encode())
+                proc.stdin.close()
+                deadline = time.monotonic() + timeout
+                while True:
+                    if time.monotonic() >= deadline:
+                        raise DownloadError('timeout')
+                    if out.tell() + err.tell() > 8 * 1024 * 1024:
+                        raise DownloadError('limit')
+                    if os.name == 'posix' and Path('/proc').exists():
+                        memory = 0
+                        for stat in Path('/proc').glob('[0-9]*/stat'):
+                            try:
+                                fields = stat.read_text().rsplit(') ', 1)[1].split()
+                                if int(fields[2]) == proc.pid:
+                                    memory += int(fields[21]) * os.sysconf('SC_PAGE_SIZE')
+                            except (OSError, ValueError, IndexError):
+                                continue
+                        if memory > MAX_WORKER_MEMORY:
+                            raise DownloadError('limit')
+                    if directory and sum(p.stat().st_size for p in Path(directory).rglob('*') if p.is_file()) > MAX_BYTES:
+                        raise DownloadError('limit')
+                    try:
+                        proc.wait(timeout=0.25)
+                        break
+                    except subprocess.TimeoutExpired:
+                        pass
+                out.seek(0)
+                result = json.loads(out.read(8 * 1024 * 1024))
+                if proc.returncode or result.get('error'):
+                    raise DownloadError(result.get('error', 'unsupported'))
+                return result
+            finally:
+                if proc.poll() is None:
+                    if os.name != 'nt':
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    else:
+                        proc.kill()
+                proc.wait()
+    except (json.JSONDecodeError, OSError) as error:
+        raise DownloadError('dependency_missing' if isinstance(error, FileNotFoundError) else 'network_error') from error
+    finally:
+        _TASK_SLOT.release()
 
-    # Format choice + command (rebuilt on retry after re-extraction).
-    cmd = _build_download_cmd(info, platform, quality, base, clean_url)
 
-    result = None
-    last_error = "下载失败"
-    # Two retries with a fresh manifest: HLS segment URLs are short-lived,
-    # so a transient fragment failure is often fixed by re-extracting
-    # and starting over from clean partial files. Bilibili's CDN also
-    # intermittently rejects with HTTP 567 and succeeds on a fresh try.
-    for attempt in range(3):
-        if attempt:
-            for stale in DOWNLOADS_DIR.glob(f"{base}.*"):
-                try:
-                    stale.unlink()
-                except OSError:
-                    pass
-            info = get_info(clean_url)
-            cmd = _build_download_cmd(info, platform, quality, base, clean_url)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if result.returncode == 0:
-            break
-        tail = (result.stderr or "").strip().splitlines()
-        last_error = tail[-1] if tail else "下载失败"
-    if result is None or result.returncode != 0:
-        raise RuntimeError(_explain_failure(clean_url, last_error))
+def get_info(url):
+    parsed = parse_url(url)
+    if parsed['platform']['key'] == 'wechat':
+        raise DownloadError('official_export_required')
+    return _run_worker('info', parsed['url'])['info']
 
-    return _finish_download(info, platform, clean_url, base)
+
+def file_token(filename, expires=None):
+    expires = int(time.time()) + FILE_TTL if expires is None else expires
+    signature = hmac.new(_FILE_KEY, f'{expires}:{filename}'.encode(), hashlib.sha256).hexdigest()
+    return f'{expires}.{signature}'
+
+
+def valid_file_token(filename, token):
+    try:
+        expires = int(token.split('.', 1)[0])
+        return int(time.time()) < expires <= int(time.time()) + FILE_TTL + 1 and hmac.compare_digest(token, file_token(filename, expires))
+    except (ValueError, AttributeError):
+        return False
+
+
+def download(url, confirmed, quality='best', keep_file=False):
+    if not confirmed:
+        raise ValueError('请先确认这是本人上传、已授权或平台明确允许下载的内容。')
+    if quality not in ('best', '1080p', '720p'):
+        raise ValueError('不支持的画质，请选择 best、1080p 或 720p。')
+    parsed = parse_url(url)
+    if parsed['platform']['key'] == 'wechat':
+        raise DownloadError('official_export_required')
+    DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    if shutil.disk_usage(DOWNLOADS_DIR).free < MAX_BYTES * 2:
+        raise DownloadError('limit')
+    tasks = DOWNLOADS_DIR / '.tasks'
+    tasks.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=tasks) as tmp:
+        task = Path(tmp)
+        result = _run_worker('download', parsed['url'], quality, task)
+        info = result['info']
+        origin = (task / result['path']).resolve()
+        if origin.parent != task.resolve() or origin.suffix not in ('.mp4', '.mkv', '.webm') or not origin.is_file() or not 0 < origin.stat().st_size <= MAX_BYTES:
+            raise DownloadError('invalid_media')
+        base = _safe_filename(info.get('title') or 'video', 30) + '_' + secrets.token_hex(12)
+        final = DOWNLOADS_DIR / (base + origin.suffix)
+        sidecar = final.with_suffix('.json')
+        metadata = {**info, 'source_url': source_url(parsed['url']), 'platform': parsed['platform'],
+                    'file': final.name, 'bytes': origin.stat().st_size, 'requested_quality': quality,
+                    'managed_by': 'social-video-downloader',
+                    'expires_at': None if keep_file else int(time.time()) + FILE_TTL,
+                    'note': '仅限本人、授权或平台明确允许下载内容；原生视频流不等于已验证无水印。'}
+        try:
+            origin.replace(final)
+            sidecar.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding='utf-8')
+        except OSError:
+            final.unlink(missing_ok=True)
+            sidecar.unlink(missing_ok=True)
+            raise DownloadError('limit')
+        return {'file': final.name, 'path': str(final), 'bytes': final.stat().st_size,
+                'metadata_file': sidecar.name, 'platform': parsed['platform'], 'info': info,
+                'watermark_note': '水印状态：未验证。本工具不去除水印或版权标识。'}
