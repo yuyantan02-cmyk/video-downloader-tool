@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -18,6 +19,16 @@ BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="Social Video Downloader", version="0.1.0")
+
+# GitHub Pages (https://<user>.github.io/...) is a different origin from the
+# Render backend, so browsers block fetch() without CORS. Allow cross-origin
+# calls to the public, no-login API endpoints; no cookies/credentials are used.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 
 class ParseRequest(BaseModel):
@@ -70,9 +81,16 @@ def api_download(req: DownloadRequest):
 @app.get("/files/{filename}")
 def serve_file(filename: str):
     # Only serve files from the local downloads dir, no path traversal.
-    if ".." in filename or "/" in filename or "\\" in filename:
+    # NOTE: do NOT reject on the substring ".." — legitimate video titles
+    # often end with "..." (ellipsis), e.g. "标题....mp4". Block only
+    # actual traversal: "/" or "\" separators, NUL, or "." / ".." as a
+    # whole name, and verify the resolved path stays inside downloads/.
+    if not filename or filename in (".", "..") or "/" in filename or "\\" in filename or "\x00" in filename:
         raise HTTPException(status_code=400, detail="非法文件名")
-    path = BASE_DIR.parent / "downloads" / filename
+    downloads_dir = (BASE_DIR.parent / "downloads").resolve()
+    path = (downloads_dir / filename).resolve()
+    if path.parent != downloads_dir:
+        raise HTTPException(status_code=400, detail="非法文件名")
     if not path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")
     return FileResponse(path, filename=filename, media_type="video/mp4")

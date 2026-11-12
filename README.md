@@ -21,8 +21,8 @@
 需要 Python 3.10+ 和 ffmpeg。
 
 ```bash
-git clone https://github.com/<你的用户名>/social-video-downloader.git
-cd social-video-downloader
+git clone https://github.com/yuyantan02-cmyk/video-downloader-tool.git
+cd video-downloader-tool
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -38,6 +38,21 @@ python cli.py "https://www.youtube.com/watch?v=..." --confirm --quality best
 ```
 
 下载的文件在 `downloads/`，旁边会有一个同名 `.json`，保存标题、作者、原链接。
+
+## 公开部署（零成本，推荐：Render 一体部署）
+
+不用 GitHub Pages。FastAPI 本身就在 `/` 提供网页，所以一个 Render 服务就同时是前端 + 后端，打开一个网址就能用。
+
+1. 把代码推到 GitHub：
+```bash
+gh repo create video-downloader-tool --public --source=. --push
+```
+2. 打开 https://dashboard.render.com ，用 GitHub 账号登录。
+3. New → Web Service → 选择 `video-downloader-tool` 这个仓库。Render 会自动读仓库里的 `render.yaml`（已写好 `plan: free`，免费版）。
+4. 点 Deploy，等构建完成，会得到一个网址，形如 `https://video-downloader-tool.onrender.com`。
+5. 打开那个网址，粘贴链接就能下载。不用再填后端地址。
+
+注意：Render 免费版 15 分钟没人用会休眠，第一次打开要等 30-60 秒唤醒。
 
 ## Docker
 

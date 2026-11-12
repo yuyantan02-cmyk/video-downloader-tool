@@ -1,63 +1,1022 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>社交视频下载器</title>
-<style>
-  body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; line-height: 1.6; color: #222; }
-  h1 { font-size: 24px; }
-  textarea, select { width: 100%; padding: 10px; font-size: 15px; margin: 8px 0; }
-  button { padding: 10px 18px; font-size: 15px; cursor: pointer; }
-  .note { background: #f6f6f6; border-left: 4px solid #888; padding: 10px 12px; font-size: 14px; }
-  #out { white-space: pre-wrap; background: #111; color: #eee; padding: 12px; margin-top: 16px; font-size: 13px; }
-  label { font-size: 14px; }
-</style>
-</head>
-<body>
-<h1>社交视频下载器</h1>
-<p>粘贴一个视频分享链接，工具会解析并下载平台提供的最高画质源流。只取干净源流，不涂抹、不做 AI 去水印。</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>社交视频下载器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #f6f6f4;
+        --surface: #ffffff;
+        --surface-2: #efefec;
+        --ink: #16181d;
+        --muted: #5b636e;
+        --faint: #8a919b;
+        --line: #e2e3de;
+        --line-strong: #c9cbc4;
+        --accent: #d92c1f;
+        --accent-dark: #b71f14;
+        --accent-soft: #fdecea;
+        --ok: #177245;
+        --ok-soft: #e7f4ec;
+        --warn-bg: #fff6e3;
+        --warn-line: #e3a93c;
+        --warn-ink: #7a5410;
+        --code-bg: #14161a;
+        --code-ink: #f0f0ec;
+        --code-dim: #9aa3ad;
+        --chip-bg: #f0f0ed;
+        --shadow: 0 1px 2px rgba(20, 22, 26, .05), 0 10px 30px -18px rgba(20, 22, 26, .25);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1114;
+          --surface: #171a1f;
+          --surface-2: #1e2229;
+          --ink: #eceef1;
+          --muted: #a3abb5;
+          --faint: #767f89;
+          --line: #262b33;
+          --line-strong: #39404b;
+          --accent: #ff5347;
+          --accent-dark: #ff6f66;
+          --accent-soft: #3a1d1a;
+          --ok: #4cc38a;
+          --ok-soft: #173327;
+          --warn-bg: #33270f;
+          --warn-line: #a97c22;
+          --warn-ink: #f0cd8a;
+          --code-bg: #0a0c0f;
+          --code-ink: #f0f0ec;
+          --code-dim: #8b95a1;
+          --chip-bg: #22262e;
+          --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.7);
+        }
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Noto Sans SC", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 16px;
+        line-height: 1.65;
+      }
+      .mono { font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px 72px; }
 
-<div class="note">
-  合规提醒：仅用于你本人上传的内容、已获得权利人授权的内容，或平台允许公开下载的内容。下载后请保留作者信息，不要二次分发。私密 / 需登录 / DRM 保护的视频不会下载。
-</div>
+      /* ---------- 头部 ---------- */
+      .hero { padding: 44px 0 8px; }
+      .hero h1 {
+        font-size: clamp(28px, 5.2vw, 44px);
+        font-weight: 900;
+        line-height: 1.22;
+        letter-spacing: -.01em;
+        margin: 0 0 12px;
+        max-width: 18em;
+      }
+      .hero h1 .hl { color: var(--accent); }
+      .hero p { margin: 0; color: var(--muted); font-size: 16.5px; max-width: 44em; }
+      .hero p b { color: var(--ink); font-weight: 700; }
 
-<textarea id="text" rows="3" placeholder="粘贴分享链接，例如 https://www.youtube.com/watch?v=..."></textarea>
-<label>画质
-  <select id="quality">
-    <option value="best">最高画质</option>
-    <option value="1080p">最高 1080p</option>
-    <option value="720p">最高 720p（文件更小）</option>
-  </select>
-</label>
-<p><label><input type="checkbox" id="confirmed"> 我确认：这是我本人上传的内容，或已获得权利人授权，或属于可公开下载的内容。</label></p>
-<p>
-  <button id="parseBtn">1. 解析</button>
-  <button id="dlBtn">2. 下载</button>
-</p>
-<div id="out">等待操作…</div>
+      /* ---------- 工具卡 ---------- */
+      .tool {
+        margin-top: 26px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        padding: 22px;
+      }
+      .tool label.field-label, .group-label {
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: .04em;
+        color: var(--muted);
+        margin: 0 0 8px;
+      }
+      .paste-row { position: relative; }
+      textarea#shareText {
+        width: 100%;
+        min-height: 96px;
+        resize: vertical;
+        border: 1.5px solid var(--line-strong);
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--ink);
+        font: inherit;
+        font-size: 16px;
+        line-height: 1.55;
+        padding: 14px 16px;
+      }
+      textarea#shareText:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+      textarea#shareText::placeholder { color: var(--faint); }
+      .paste-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+      .mini-btn {
+        appearance: none;
+        border: 1px solid var(--line-strong);
+        background: var(--surface);
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 8px 14px;
+        min-height: 38px;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex; align-items: center; gap: 7px;
+      }
+      .mini-btn:hover { background: var(--surface-2); }
+      .mini-btn svg { width: 15px; height: 15px; flex: none; }
+      .example-note { font-size: 13.5px; color: var(--faint); }
 
-<script>
-const out = document.getElementById('out');
-function show(x){ out.textContent = typeof x === 'string' ? x : JSON.stringify(x, null, 2); }
-async function post(path, body){
-  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  const j = await r.json();
-  if(!r.ok) throw new Error(j.detail || r.statusText);
-  return j;
-}
-document.getElementById('parseBtn').onclick = async () => {
-  try { show('解析中…'); const j = await post('/api/parse', {text: document.getElementById('text').value}); show(j); }
-  catch(e){ show('解析失败：' + e.message); }
-};
-document.getElementById('dlBtn').onclick = async () => {
-  try {
-    show('下载中，请稍等…');
-    const j = await post('/api/download', {text: document.getElementById('text').value, quality: document.getElementById('quality').value, confirmed: document.getElementById('confirmed').checked});
-    show(j);
-    if(j.download_url){ const a = document.createElement('a'); a.href = j.download_url; a.textContent = '下载视频：' + j.file; a.style.display='block'; a.style.marginTop='12px'; out.appendChild(a); }
-  } catch(e){ show('下载失败：' + e.message); }
-};
-</script>
-</body>
+      .detect {
+        margin-top: 16px;
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
+        padding: 12px 14px;
+        display: none;
+      }
+      .detect.show { display: block; }
+      .detect .row1 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+      .plat-chip {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: var(--chip-bg);
+        border-radius: 999px;
+        padding: 5px 13px 5px 10px;
+        font-weight: 700; font-size: 14.5px;
+      }
+      .plat-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); }
+      .tier-tag { font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+      .tier-stable { background: var(--ok-soft); color: var(--ok); }
+      .tier-ytdlp { background: var(--warn-bg); color: var(--warn-ink); }
+      .tier-official { background: var(--accent-soft); color: var(--accent); }
+      .detect .clean-url { margin-top: 8px; font-size: 13.5px; color: var(--muted); word-break: break-all; }
+      .detect .clean-url b { color: var(--ink); font-weight: 600; }
+      .detect .plat-note { margin-top: 6px; font-size: 13.5px; color: var(--muted); }
+      .detect.unknown .plat-note { color: var(--accent); }
+
+      .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 28px; margin-top: 22px; }
+      @media (max-width: 680px) { .tool-grid { grid-template-columns: 1fr; } }
+      .seg { display: flex; border: 1.5px solid var(--line-strong); border-radius: 10px; overflow: hidden; }
+      .seg button {
+        flex: 1;
+        appearance: none; border: 0; background: var(--surface); color: var(--muted);
+        font: inherit; font-size: 15px; font-weight: 600;
+        padding: 10px 6px; min-height: 46px; cursor: pointer;
+      }
+      .seg button + button { border-left: 1px solid var(--line); }
+      .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+      .seg-hint { font-size: 13px; color: var(--faint); margin-top: 7px; }
+
+      .confirm-btn {
+        width: 100%;
+        display: flex; align-items: flex-start; gap: 12px;
+        text-align: left;
+        appearance: none;
+        border: 1.5px solid var(--line-strong);
+        background: var(--surface);
+        color: var(--ink);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font: inherit; font-size: 14.5px; line-height: 1.55;
+        cursor: pointer; min-height: 46px;
+      }
+      .confirm-btn .box {
+        flex: none; width: 22px; height: 22px; margin-top: 1px;
+        border: 2px solid var(--line-strong); border-radius: 6px;
+        display: grid; place-items: center;
+        color: transparent;
+      }
+      .confirm-btn .box svg { width: 14px; height: 14px; }
+      .confirm-btn[aria-pressed="true"] { border-color: var(--ok); background: var(--ok-soft); }
+      .confirm-btn[aria-pressed="true"] .box { background: var(--ok); border-color: var(--ok); color: #fff; }
+      .confirm-btn small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+      .backend {
+        margin-top: 22px;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+      }
+      .backend-row { display: flex; gap: 10px; flex-wrap: wrap; }
+      .backend-row input {
+        flex: 1 1 260px;
+        border: 1.5px solid var(--line-strong);
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--ink);
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 14.5px;
+        padding: 10px 14px; min-height: 46px;
+      }
+      .backend-row input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+      .status-line { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+      .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: none; }
+      .status-dot.ok { background: var(--ok); }
+      .status-dot.bad { background: var(--accent); }
+      .status-dot.busy { background: var(--warn-line); }
+
+      .actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+      .btn {
+        appearance: none; border-radius: 10px; cursor: pointer;
+        font: inherit; font-size: 16.5px; font-weight: 700;
+        padding: 13px 26px; min-height: 52px;
+        display: inline-flex; align-items: center; gap: 9px;
+      }
+      .btn svg { width: 18px; height: 18px; }
+      .btn-primary { background: var(--accent); border: 1.5px solid var(--accent); color: #fff; }
+      .btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+      .btn-ghost { background: var(--surface); border: 1.5px solid var(--ink); color: var(--ink); }
+      .btn-ghost:hover { background: var(--surface-2); }
+      .btn[disabled] { opacity: .42; cursor: not-allowed; }
+      .btn[disabled]:hover { background: var(--accent); border-color: var(--accent); }
+      .btn-ghost[disabled]:hover { background: var(--surface); }
+      .actions .why { flex-basis: 100%; font-size: 13.5px; color: var(--faint); margin: 0; }
+
+      /* ---------- 结果区 ---------- */
+      .result { margin-top: 20px; display: none; }
+      .result.show { display: block; }
+      .result-box { border-radius: 12px; padding: 18px; border: 1px solid var(--line); background: var(--surface-2); }
+      .result-box.err { background: var(--accent-soft); border-color: var(--accent); }
+      .result-box.ok { background: var(--surface); border-color: var(--line-strong); }
+      .result-box h3 { margin: 0 0 6px; font-size: 17px; font-weight: 900; }
+      .result-box p { margin: 6px 0; font-size: 14.5px; color: var(--muted); }
+      .result-box p b { color: var(--ink); }
+      .spinner {
+        width: 18px; height: 18px; border-radius: 50%;
+        border: 2.5px solid var(--line-strong); border-top-color: var(--accent);
+        animation: spin .8s linear infinite; display: inline-block; vertical-align: -3px; margin-right: 8px;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+      .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 20px; margin: 14px 0 4px; }
+      .meta-grid .k { font-size: 12.5px; color: var(--faint); font-weight: 700; letter-spacing: .03em; }
+      .meta-grid .v { font-size: 15.5px; font-weight: 600; word-break: break-word; }
+      .formats { margin-top: 14px; border-top: 1px solid var(--line); }
+      .formats .f-row {
+        display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap;
+        padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 14px;
+      }
+      .formats .f-res { font-weight: 900; font-size: 15px; min-width: 74px; }
+      .formats .f-dim { color: var(--muted); }
+      .formats .f-size { margin-left: auto; color: var(--muted); font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+      .formats .f-best { font-size: 12px; font-weight: 700; color: var(--ok); background: var(--ok-soft); border-radius: 999px; padding: 2px 8px; }
+      .dl-big {
+        display: inline-flex; align-items: center; gap: 9px;
+        margin-top: 14px;
+        background: var(--ok); color: #fff; text-decoration: none;
+        font-weight: 700; font-size: 16px;
+        padding: 13px 24px; border-radius: 10px; min-height: 52px;
+        word-break: break-all;
+      }
+      .dl-big svg { width: 18px; height: 18px; flex: none; }
+      .err-help { margin-top: 10px; font-size: 14px; }
+      .err-help a { color: var(--accent); font-weight: 700; }
+
+      /* ---------- 通用区块 ---------- */
+      section.block { margin-top: 54px; }
+      section.block > h2 { font-size: clamp(21px, 3.4vw, 27px); font-weight: 900; margin: 0 0 8px; letter-spacing: -.01em; }
+      section.block > .lede { color: var(--muted); margin: 0 0 20px; max-width: 46em; }
+      .card {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+        padding: 22px; box-shadow: var(--shadow);
+      }
+      .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+      .card h3 { margin: 0 0 6px; font-size: 17.5px; font-weight: 900; display: flex; align-items: center; gap: 10px; }
+      .card h3 .n {
+        flex: none; width: 28px; height: 28px; border-radius: 50%;
+        background: var(--ink); color: var(--bg);
+        display: grid; place-items: center; font-size: 14.5px; font-weight: 900;
+      }
+      .card p { color: var(--muted); font-size: 14.5px; margin: 6px 0 12px; }
+      .codeblock {
+        position: relative;
+        background: var(--code-bg); color: var(--code-ink);
+        border-radius: 10px; padding: 14px 16px;
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 13.5px; line-height: 1.75;
+        overflow-x: auto; white-space: pre;
+        margin: 10px 0;
+      }
+      .codeblock .cm { color: var(--code-dim); }
+      .copy-btn {
+        position: absolute; top: 8px; right: 8px;
+        appearance: none; border: 1px solid #3a4048; background: #1d2126; color: #e8e8e4;
+        border-radius: 7px; font: inherit; font-family: "Noto Sans SC", sans-serif;
+        font-size: 12.5px; font-weight: 600; padding: 6px 12px; min-height: 32px; cursor: pointer;
+      }
+      .copy-btn:hover { background: #262b31; }
+      .cli-out {
+        background: var(--code-bg); color: var(--code-ink);
+        border-radius: 10px; padding: 14px 16px;
+        font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 13.5px;
+        word-break: break-all; margin: 10px 0 0;
+      }
+
+      .plat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 12px; }
+      .plat-item {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+        padding: 15px 16px;
+      }
+      .plat-item .top { display: flex; align-items: center; gap: 9px; font-weight: 900; font-size: 16px; }
+      .plat-item .st { margin-left: auto; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+      .plat-item p { margin: 8px 0 0; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+
+      .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 12px; counter-reset: step; }
+      .step {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px;
+      }
+      .step .num { font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--accent); font-size: 14px; }
+      .step h3 { margin: 6px 0 5px; font-size: 16px; font-weight: 900; }
+      .step p { margin: 0; font-size: 14px; color: var(--muted); }
+
+      details.faq {
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+        margin-bottom: 10px; padding: 4px 18px;
+      }
+      details.faq summary {
+        cursor: pointer; font-weight: 700; font-size: 16px;
+        padding: 13px 0; min-height: 44px; list-style-position: inside;
+      }
+      details.faq p { color: var(--muted); font-size: 14.5px; margin: 0 0 16px; }
+      details.faq code, .card p code, .lede code {
+        font-family: "IBM Plex Mono", monospace; font-size: .88em;
+        background: var(--surface-2); border: 1px solid var(--line);
+        padding: 1px 6px; border-radius: 6px;
+      }
+      .compliance {
+        margin-top: 54px;
+        border: 1px solid var(--warn-line); background: var(--warn-bg); color: var(--warn-ink);
+        border-radius: 14px; padding: 20px 22px; font-size: 14.5px;
+      }
+      .compliance h2 { font-size: 17px; margin: 0 0 6px; font-weight: 900; color: inherit; }
+      .compliance p { margin: 4px 0; }
+      footer { margin-top: 34px; color: var(--faint); font-size: 13.5px; line-height: 1.7; }
+      a { color: var(--accent); }
+      button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible {
+        outline: 2px solid var(--accent); outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+
+      <!-- ================= 工具 ================= -->
+      <div class="hero">
+        <h1>粘贴视频链接，<br />拿回<span class="hl">原画质</span>的视频文件</h1>
+        <p>把任意平台的分享链接贴进来 —— <b>YouTube、TikTok、抖音、X、Instagram、Facebook、Threads、小红书、Bilibili、快手</b>都行。工具只取平台本来就存着的干净源流，不涂抹、不做 AI 去水印；水印如果已经烧进原片，会如实保留并告诉你。</p>
+      </div>
+
+      <div class="tool" id="tool">
+        <label class="field-label" for="shareText">视频链接 / 整段分享文案</label>
+        <div class="paste-row">
+          <textarea id="shareText" rows="3" placeholder="把分享文案整段贴进来也可以，工具会自动挑出里面的链接。例如：https://www.youtube.com/watch?v=…"></textarea>
+        </div>
+        <div class="paste-actions">
+          <button type="button" class="mini-btn" id="pasteBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+            粘贴
+          </button>
+          <button type="button" class="mini-btn" id="clearBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            清空
+          </button>
+          <button type="button" class="mini-btn" id="exampleBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="currentColor" stroke="none"/></svg>
+            填入示例链接
+          </button>
+          <span class="example-note">示例是 YouTube 上第一支视频《Me at the zoo》，公开可下载。</span>
+        </div>
+
+        <div class="detect" id="detectBox" aria-live="polite">
+          <div class="row1">
+            <span class="plat-chip"><span class="plat-dot" id="detectDot"></span><span id="detectName">—</span></span>
+            <span class="tier-tag" id="detectTier"></span>
+          </div>
+          <div class="clean-url mono" id="detectUrl"></div>
+          <div class="plat-note" id="detectNote"></div>
+        </div>
+
+        <div class="tool-grid">
+          <div>
+            <span class="group-label" id="qualityLabel">画质</span>
+            <div class="seg" role="group" aria-labelledby="qualityLabel">
+              <button type="button" data-quality="best" aria-pressed="true">最高画质</button>
+              <button type="button" data-quality="1080p" aria-pressed="false">≤ 1080p</button>
+              <button type="button" data-quality="720p" aria-pressed="false">≤ 720p</button>
+            </div>
+            <div class="seg-hint">最高画质 = 平台给的上限。YouTube 高清是音视频分离的，工具会自动合并成 MP4。</div>
+          </div>
+          <div>
+            <span class="group-label">下载确认</span>
+            <button type="button" class="confirm-btn" id="confirmBtn" aria-pressed="false">
+              <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              <span>我确认这是我本人上传的、已获授权的，或可公开下载的内容
+                <small>点一下确认。没确认时「下载视频」按不了 —— 这是工具自带的规矩，不是走形式。</small>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div class="backend">
+          <label class="field-label" for="apiBase">解析后端地址</label>
+          <div class="backend-row">
+            <input id="apiBase" type="url" inputmode="url" autocomplete="off" spellcheck="false" value="" placeholder="留空 = 使用当前网站（Render 已部署）" />
+            <button type="button" class="mini-btn" id="healthBtn" style="min-height:46px;padding:10px 18px;font-weight:700;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              检测连接
+            </button>
+          </div>
+          <div class="status-line" aria-live="polite">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">已部署在 Render 上，默认用当前网站当后端，不用填地址。点「检测连接」确认一下就行。</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn btn-ghost" id="parseBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            1 · 先解析看看
+          </button>
+          <button type="button" class="btn btn-primary" id="downloadBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+            2 · 下载视频
+          </button>
+          <p class="why" id="whyDisabled">先粘贴一个链接。</p>
+        </div>
+
+        <div class="result" id="result" aria-live="polite"></div>
+      </div>
+
+      <!-- ================= 后端没启动怎么办 ================= -->
+      <section class="block" id="setup">
+        <h2>后端没启动？两条路，选一条</h2>
+        <p class="lede">这个网页是前台，真正干活的是一个很小的 Python 后端（yt-dlp + FastAPI，就是先前已经做好的那套）。静态网页 —— 包括 GitHub Pages 那种 <code>xxx.github.io</code> 地址 —— 只能放页面、跑不了 Python，所以下载必须连上一个后端。连上之后，这个页面就是完整的下载器。</p>
+        <div class="two-col">
+          <div class="card">
+            <h3><span class="n">A</span>在自己电脑上启动（免费，3 分钟）</h3>
+            <p>用之前发你的 <b>video-downloader-tool</b> 文件夹（或压缩包解压出来的那个）。在文件夹里打开「终端」，依次运行：</p>
+            <div class="codeblock"><button type="button" class="copy-btn" data-copy="macCmd">复制</button><span id="macCmd">cd ~/Downloads/video-downloader-tool
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8000</span></div>
+            <p>看到 <code>Uvicorn running on http://127.0.0.1:8000</code> 就说明起来了，终端窗口别关，回到这个页面点「检测连接」。<br />提示找不到 <code>ffmpeg</code> 时先运行 <code>brew install ffmpeg</code>。Windows 把第二、三行换成 <code>py -m venv .venv</code> 和 <code>.venv\Scripts\activate</code>，其余一样。</p>
+          </div>
+          <div class="card">
+            <h3><span class="n">B</span>部署到云上，手机也能用（已部署）</h3>
+            <p>把代码仓库推到 GitHub 后（仓库里已经带了 <code>Dockerfile</code>、<code>docker-compose.yml</code> 和 <code>render.yaml</code>），在 Render 这类平台上选「New → Web Service / Blueprint」，指向这个仓库部署即可。部署完会得到一个公开地址，长这样：</p>
+            <div class="codeblock"><span class="cm"># 举例，换成你自己部署得到的地址</span>
+https://video-downloader-tool-5ffe.onrender.com</div>
+            <p>把这个地址填到上面「解析后端地址」里，点「检测连接」变绿就能用了 —— 之后手机、平板打开这个网页填同一个地址，一样能下。</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:18px;">
+          <h3>连不上时，也可以直接用命令行</h3>
+          <p>后端代码里带了一个命令行入口，效果和网页下载完全一样。你粘贴链接后，下面这行命令会自动生成，复制到终端里运行即可（需要先完成左边 A 的前三行安装步骤）：</p>
+          <div class="cli-out mono" id="cliOut">python cli.py "（先在上面粘贴一个链接）" --confirm --quality best</div>
+          <p style="margin-top:12px;"><button type="button" class="mini-btn" id="copyCliBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            复制这行命令</button></p>
+        </div>
+      </section>
+
+      <!-- ================= 支持平台 ================= -->
+      <section class="block">
+        <h2>支持的平台</h2>
+        <p class="lede">分三档，是按实际能下到的程度标的，不按宣传标：核心档走 yt-dlp 最稳；兜底档能下，但平台改接口时可能暂时失效，升级 yt-dlp 通常就恢复；视频号必须本人在官方客户端里操作，工具不碰登录态。</p>
+        <div class="plat-grid" id="platGrid"></div>
+      </section>
+
+      <!-- ================= 工作原理 ================= -->
+      <section class="block">
+        <h2>它是怎么拿到「无水印原画质」的</h2>
+        <p class="lede">没有擦除、没有修复、没有 AI 补画。原理是平台服务器上本来就存着两份：你在 App 里点「保存」拿到的是盖了水印的那份，工具去取的是没盖水印的源文件那份。</p>
+        <div class="steps">
+          <div class="step"><div class="num">01</div><h3>识别链接</h3><p>从整段分享文案里挑出真正的链接，按域名判断是哪个平台，短链也认。</p></div>
+          <div class="step"><div class="num">02</div><h3>实时解析</h3><p>后端用 yt-dlp 现查这个视频的全部画质档位。必须现查 —— 播放地址带签名，缓存的旧地址很快过期。</p></div>
+          <div class="step"><div class="num">03</div><h3>取干净源流</h3><p>默认选最高一档；TikTok 明确向平台要无水印源流，YouTube 把分离的音视频用 ffmpeg 合成一个 MP4。</p></div>
+          <div class="step"><div class="num">04</div><h3>校验并附出处</h3><p>下完校验文件完整性，旁边生成一个同名 .json，记着标题、作者和原链接，署名不丢。</p></div>
+        </div>
+      </section>
+
+      <!-- ================= FAQ ================= -->
+      <section class="block">
+        <h2>常见问题</h2>
+        <details class="faq">
+          <summary>为什么打开 127.0.0.1:8000 显示「无法连接服务器」？</summary>
+          <p>因为 127.0.0.1 指的是「你自己的这台电脑」，不是云端的某个网站。那个小服务没在你电脑上跑着的时候，这个地址后面什么都没有，浏览器自然连不上。按上面 A 的步骤先把服务跑起来，再刷新就行 —— 这个网页版就是为了解决这件事才做的：页面随时能打开，后端连上就开工。</p>
+        </details>
+        <details class="faq">
+          <summary>下完发现画质只有 720p，是被压缩了吗？</summary>
+          <p>不是。工具拿的就是平台给的最高一档，很多平台的视频本身最高就是 720p 或 1080p，「原画质」指的是相对 App 保存版不打折扣，不是能凭空变出 4K。先点「解析看看」，格式列表里列出的就是这个视频真实存在的全部档位。</p>
+        </details>
+        <details class="faq">
+          <summary>提示「需要登录 / 私密内容」怎么办？</summary>
+          <p>说明这个视频是私密的、要登录才能看，或者有年龄 / DRM 限制。工具不登录任何账号、不存 Cookie，这类内容会直接拒绝。你自己的作品遇到这种情况，用平台官方的导出功能拿原文件最稳妥。</p>
+        </details>
+        <details class="faq">
+          <summary>下回来的视频怎么还有水印？</summary>
+          <p>两种可能：一是创作者上传时就把水印烧进了画面本身，那它就是原片的一部分，谁都拿不到「没烧过」的版本；二是平台这次没提供干净流。工具不会用涂抹或 AI 去硬擦，会原样返回并在结果里说明。</p>
+        </details>
+        <details class="faq">
+          <summary>昨天还能解析，今天突然失败了？</summary>
+          <p>大概率是平台又改接口了，这是这类工具最常见的故障。先在后端环境里运行 <code>pip install -U yt-dlp</code> 升级解析引擎，多数情况就恢复了；抖音、小红书这类平台偶尔要等专用解析器更新。</p>
+        </details>
+        <details class="faq">
+          <summary>微信视频号为什么不能直接下？</summary>
+          <p>视频号的视频基本都要登录态才能拿到，绕开登录去取既不稳定也不合规，所以工具只识别、不抓取。请在微信官方客户端里用官方方式保存你自己的视频号作品。</p>
+        </details>
+      </section>
+
+      <!-- ================= 合规 ================= -->
+      <div class="compliance">
+        <h2>使用边界，先说清</h2>
+        <p>只下载你本人上传的、已获得权利人授权的，或平台明确允许公开下载的内容。下载文件旁的 .json 会保留作者、标题和原链接，请勿抹去署名、勿二次分发。私密、需登录、DRM 保护的内容，工具一律拒绝。</p>
+      </div>
+
+      <footer>
+        社交视频下载器 · 网页前台 + yt-dlp / FastAPI 后端<br />
+        后端源码在 video-downloader-tool 仓库：<span class="mono">app/main.py</span>（服务）、<span class="mono">app/downloader.py</span>（解析下载）、<span class="mono">app/platforms.py</span>（平台识别）、<span class="mono">cli.py</span>（命令行）。
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        "use strict";
+
+        /* ---------- 平台数据（与后端 app/platforms.py 保持一致） ---------- */
+        var PLATFORMS = [
+          { key: "youtube", name: "YouTube", color: "#ff0033", tier: "stable", tierLabel: "核心支持",
+            patterns: [/youtube\.com\/(watch|shorts|live|embed)/i, /youtu\.be\//i],
+            note: "最高画质走分离流合并，解析最稳。" },
+          { key: "tiktok", name: "TikTok", color: "#161823", tier: "stable", tierLabel: "核心支持",
+            patterns: [/tiktok\.com\/@[^/]+\/video\/\d+/i, /tiktok\.com\/t\//i, /vt\.tiktok\.com\//i, /vm\.tiktok\.com\//i],
+            note: "会明确向平台要无水印的干净源流。" },
+          { key: "instagram", name: "Instagram", color: "#e1306c", tier: "stable", tierLabel: "核心支持",
+            patterns: [/instagram\.com\/(reel|reels|p|stories)\//i, /instagr\.am\//i],
+            note: "仅公开帖子 / Reels，需登录的会拒绝。" },
+          { key: "facebook", name: "Facebook", color: "#1877f2", tier: "stable", tierLabel: "核心支持",
+            patterns: [/facebook\.com\/.*\/(videos|reel|watch)/i, /fb\.watch\//i, /fb\.com\//i],
+            note: "仅公开视频。" },
+          { key: "x", name: "X", color: "#000000", tier: "stable", tierLabel: "核心支持",
+            patterns: [/(twitter|x)\.com\/[^/]+\/status\/\d+/i, /t\.co\//i],
+            note: "仅公开帖子里的视频。" },
+          { key: "threads", name: "Threads", color: "#000000", tier: "stable", tierLabel: "核心支持",
+            patterns: [/threads\.net\/@[^/]+\/post\//i, /threads\.com\/@[^/]+\/post\//i],
+            note: "仅公开帖子里的视频。" },
+          { key: "douyin", name: "抖音", color: "#161823", tier: "ytdlp", tierLabel: "yt-dlp 兜底",
+            patterns: [/douyin\.com\/video\/\d+/i, /v\.douyin\.com\//i, /iesdouyin\.com\//i],
+            note: "当前走 yt-dlp，平台改接口时可能暂时失效，升级 yt-dlp 通常恢复。" },
+          { key: "xiaohongshu", name: "小红书", color: "#ff2442", tier: "ytdlp", tierLabel: "yt-dlp 兜底",
+            patterns: [/xiaohongshu\.com\//i, /xhslink\.com\//i, /xhslink\.cn\//i],
+            note: "当前走 yt-dlp，短链可识别；登录墙内容会拒绝。" },
+          { key: "bilibili", name: "Bilibili", color: "#00a1d6", tier: "ytdlp", tierLabel: "yt-dlp 兜底",
+            patterns: [/bilibili\.com\/video\//i, /b23\.tv\//i],
+            note: "仅公开视频；大会员专享画质拿不到。" },
+          { key: "kuaishou", name: "快手", color: "#ff4906", tier: "ytdlp", tierLabel: "yt-dlp 兜底",
+            patterns: [/kuaishou\.com\//i, /v\.kuaishou\.com\//i],
+            note: "当前走 yt-dlp。" },
+          { key: "wechat", name: "微信视频号", color: "#07c160", tier: "official", tierLabel: "官方导出",
+            patterns: [/weixin\.qq\.com\/sph\//i, /channels\.weixin\.qq\.com\//i],
+            note: "视频号需要本人在官方客户端登录操作，工具只识别、不抓取，请用官方导出。" }
+        ];
+
+        function extractUrl(text) {
+          if (!text) return null;
+          var m = String(text).match(/https?:\/\/[^\s"'<>）】]+/);
+          if (!m) return null;
+          return m[0].replace(/[.,;!?)]+$/, "");
+        }
+        function detectPlatform(url) {
+          if (!url) return null;
+          for (var i = 0; i < PLATFORMS.length; i++) {
+            var p = PLATFORMS[i];
+            for (var j = 0; j < p.patterns.length; j++) {
+              if (p.patterns[j].test(url)) return p;
+            }
+          }
+          return null;
+        }
+
+        /* ---------- 元素 ---------- */
+        var shareText = document.getElementById("shareText");
+        var detectBox = document.getElementById("detectBox");
+        var detectDot = document.getElementById("detectDot");
+        var detectName = document.getElementById("detectName");
+        var detectTier = document.getElementById("detectTier");
+        var detectUrl = document.getElementById("detectUrl");
+        var detectNote = document.getElementById("detectNote");
+        var parseBtn = document.getElementById("parseBtn");
+        var downloadBtn = document.getElementById("downloadBtn");
+        var whyDisabled = document.getElementById("whyDisabled");
+        var confirmBtn = document.getElementById("confirmBtn");
+        var apiBaseInput = document.getElementById("apiBase");
+        var healthBtn = document.getElementById("healthBtn");
+        var statusDot = document.getElementById("statusDot");
+        var statusText = document.getElementById("statusText");
+        var result = document.getElementById("result");
+        var cliOut = document.getElementById("cliOut");
+
+        var state = {
+          url: null,
+          platform: null,
+          quality: "best",
+          confirmed: false,
+          backendOk: null,
+          busy: false
+        };
+
+        function apiBase() {
+          return apiBaseInput.value.trim().replace(/\/+$/, "");
+        }
+
+        /* ---------- 平台列表渲染 ---------- */
+        var platGrid = document.getElementById("platGrid");
+        PLATFORMS.forEach(function (p) {
+          var item = document.createElement("div");
+          item.className = "plat-item";
+          var top = document.createElement("div");
+          top.className = "top";
+          var dot = document.createElement("span");
+          dot.className = "plat-dot";
+          dot.style.background = p.color;
+          var nm = document.createElement("span");
+          nm.textContent = p.name;
+          var st = document.createElement("span");
+          st.className = "st tier-" + p.tier;
+          st.textContent = p.tierLabel;
+          top.appendChild(dot); top.appendChild(nm); top.appendChild(st);
+          var desc = document.createElement("p");
+          desc.textContent = p.note;
+          item.appendChild(top); item.appendChild(desc);
+          platGrid.appendChild(item);
+        });
+
+        /* ---------- 输入识别 ---------- */
+        function refresh() {
+          var raw = shareText.value;
+          state.url = extractUrl(raw);
+          state.platform = state.url ? detectPlatform(state.url) : null;
+
+          if (!state.url) {
+            detectBox.className = "detect";
+          } else {
+            detectBox.className = "detect show" + (state.platform ? "" : " unknown");
+            if (state.platform) {
+              detectDot.style.background = state.platform.color;
+              detectName.textContent = state.platform.name;
+              detectTier.className = "tier-tag tier-" + state.platform.tier;
+              detectTier.textContent = state.platform.tierLabel;
+              detectTier.style.display = "";
+              detectNote.textContent = state.platform.note;
+            } else {
+              detectDot.style.background = "#d92c1f";
+              detectName.textContent = "未识别的平台";
+              detectTier.style.display = "none";
+              detectNote.textContent = "这个域名不在已支持列表里。可以点「解析看看」让后端再确认一次，但大概率下不了。";
+            }
+            detectUrl.innerHTML = "";
+            var b = document.createElement("b");
+            b.textContent = "清洗后的链接：";
+            detectUrl.appendChild(b);
+            detectUrl.appendChild(document.createTextNode(state.url));
+          }
+
+          var isWechat = state.platform && state.platform.key === "wechat";
+          parseBtn.disabled = state.busy || !state.url || isWechat;
+          downloadBtn.disabled = state.busy || !state.url || !state.confirmed || isWechat;
+
+          if (!state.url) whyDisabled.textContent = "先粘贴一个链接。";
+          else if (isWechat) whyDisabled.textContent = "视频号请用微信官方客户端导出，工具不抓取。";
+          else if (!state.confirmed) whyDisabled.textContent = "链接已就绪，点一下右边的下载确认就能下载；解析不需要确认。";
+          else whyDisabled.textContent = "可以下载了。若后端还没启动，下载会提示连不上，按下方 A 的步骤启动即可。";
+
+          cliOut.textContent = state.url
+            ? 'python cli.py "' + state.url + '" --confirm --quality ' + state.quality
+            : 'python cli.py "（先在上面粘贴一个链接）" --confirm --quality best';
+        }
+
+        shareText.addEventListener("input", function () {
+          result.className = "result";
+          result.innerHTML = "";
+          refresh();
+        });
+
+        document.getElementById("clearBtn").addEventListener("click", function () {
+          shareText.value = "";
+          result.className = "result";
+          result.innerHTML = "";
+          refresh();
+          shareText.focus();
+        });
+        document.getElementById("exampleBtn").addEventListener("click", function () {
+          shareText.value = "https://www.youtube.com/watch?v=jNQXAC9IVRw";
+          result.className = "result";
+          result.innerHTML = "";
+          refresh();
+        });
+        document.getElementById("pasteBtn").addEventListener("click", function () {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            navigator.clipboard.readText().then(function (t) {
+              if (t) { shareText.value = t; refresh(); }
+              else { shareText.focus(); }
+            }).catch(function () { shareText.focus(); });
+          } else {
+            shareText.focus();
+          }
+        });
+
+        /* ---------- 画质 ---------- */
+        var segBtns = document.querySelectorAll(".seg button");
+        segBtns.forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            segBtns.forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+            btn.setAttribute("aria-pressed", "true");
+            state.quality = btn.getAttribute("data-quality");
+            refresh();
+          });
+        });
+
+        /* ---------- 确认 ---------- */
+        confirmBtn.addEventListener("click", function () {
+          state.confirmed = !state.confirmed;
+          confirmBtn.setAttribute("aria-pressed", state.confirmed ? "true" : "false");
+          refresh();
+        });
+
+        /* ---------- 复制 ---------- */
+        function copyText(text, btn) {
+          function done() {
+            var old = btn.textContent;
+            btn.textContent = "已复制 ✓";
+            setTimeout(function () { btn.textContent = old; }, 1600);
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(function () { fallback(); });
+          } else { fallback(); }
+          function fallback() {
+            var ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.position = "fixed"; ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand("copy"); done(); } catch (e) { /* 复制失败时静默 */ }
+            document.body.removeChild(ta);
+          }
+        }
+        document.querySelectorAll("[data-copy]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var el = document.getElementById(btn.getAttribute("data-copy"));
+            if (el) copyText(el.textContent, btn);
+          });
+        });
+        document.getElementById("copyCliBtn").addEventListener("click", function () {
+          copyText(cliOut.textContent, this);
+        });
+
+        /* ---------- 后端通信 ---------- */
+        function fetchWithTimeout(url, options, ms) {
+          var ctrl = new AbortController();
+          var timer = setTimeout(function () { ctrl.abort(); }, ms);
+          var opts = {};
+          for (var k in options) opts[k] = options[k];
+          opts.signal = ctrl.signal;
+          return fetch(url, opts).finally(function () { clearTimeout(timer); });
+        }
+        function postJson(path, body) {
+          return fetchWithTimeout(apiBase() + path, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          }, 30000).then(function (r) {
+            return r.json().catch(function () { return {}; }).then(function (j) {
+              if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+              return j;
+            });
+          });
+        }
+        function backendUnreachableMsg(action) {
+          return action + "没成功：连不上后端 " + apiBase() + "。" +
+            "最常见的原因是后端还没在你电脑上启动（127.0.0.1 指的是你自己的电脑）。" +
+            "按下方「在自己电脑上启动」的四行命令跑起来，再点一次「检测连接」确认变绿即可。";
+        }
+        function setStatus(kind, text) {
+          statusDot.className = "status-dot" + (kind ? " " + kind : "");
+          statusText.textContent = text;
+        }
+        function checkHealth(silent) {
+          if (!silent) setStatus("busy", "正在检测 " + apiBase() + " …");
+          return fetchWithTimeout(apiBase() + "/health", { method: "GET" }, 4000)
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+              if (j && j.ok) {
+                state.backendOk = true;
+                setStatus("ok", "后端已连接（版本 " + (j.version || "?") + "），可以解析和下载了。");
+              } else {
+                state.backendOk = false;
+                setStatus("bad", "这个地址有回应，但不像是下载器后端。确认一下地址填对了没有。");
+              }
+            })
+            .catch(function () {
+              state.backendOk = false;
+              setStatus("bad", "连不上 " + apiBase() + "。后端还没启动 —— 按下方 A 的步骤在电脑上跑起来，或者把云端部署的地址填进来。");
+            });
+        }
+        healthBtn.addEventListener("click", function () { checkHealth(false); });
+        apiBaseInput.addEventListener("change", function () { state.backendOk = null; setStatus("", "地址改了，点「检测连接」试一下。"); });
+
+        /* ---------- 结果渲染 ---------- */
+        function showResult(html) {
+          result.className = "result show";
+          result.innerHTML = "";
+          var box = document.createElement("div");
+          box.className = "result-box";
+          box.innerHTML = html;
+          result.appendChild(box);
+          return box;
+        }
+        function showBusy(text) {
+          var box = showResult("");
+          box.className = "result-box";
+          var h = document.createElement("h3");
+          var sp = document.createElement("span");
+          sp.className = "spinner";
+          h.appendChild(sp);
+          h.appendChild(document.createTextNode(text));
+          box.appendChild(h);
+          var p = document.createElement("p");
+          p.textContent = "正在连后端 " + apiBase() + " ，平台响应慢的时候要等一会儿，别重复点。";
+          box.appendChild(p);
+        }
+        function showError(title, msg, withSetupLink) {
+          var box = showResult("");
+          box.className = "result-box err";
+          var h = document.createElement("h3");
+          h.textContent = title;
+          box.appendChild(h);
+          var p = document.createElement("p");
+          p.textContent = msg;
+          box.appendChild(p);
+          if (withSetupLink) {
+            var p2 = document.createElement("p");
+            p2.className = "err-help";
+            var a = document.createElement("a");
+            a.href = "#setup";
+            a.textContent = "去看后端启动办法 ↓";
+            p2.appendChild(a);
+            box.appendChild(p2);
+          }
+        }
+        function fmtDuration(sec) {
+          if (sec == null) return "—";
+          sec = Math.round(sec);
+          var m = Math.floor(sec / 60), s = sec % 60;
+          if (m >= 60) { var hh = Math.floor(m / 60); return hh + " 小时 " + (m % 60) + " 分"; }
+          return m + " 分 " + (s < 10 ? "0" : "") + s + " 秒";
+        }
+        function fmtSize(bytes) {
+          if (!bytes) return "大小未知";
+          var units = ["B", "KB", "MB", "GB"];
+          var n = bytes, i = 0;
+          while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+          return n.toFixed(n >= 100 ? 0 : 1) + " " + units[i];
+        }
+        function metaItem(k, v) {
+          var d = document.createElement("div");
+          var kk = document.createElement("div"); kk.className = "k"; kk.textContent = k;
+          var vv = document.createElement("div"); vv.className = "v"; vv.textContent = v == null || v === "" ? "—" : String(v);
+          d.appendChild(kk); d.appendChild(vv);
+          return d;
+        }
+
+        parseBtn.addEventListener("click", function () {
+          if (!state.url) return;
+          state.busy = true; refresh();
+          showBusy("正在解析…");
+          postJson("/api/parse", { text: shareText.value })
+            .then(function (j) {
+              var info = j.info || {};
+              var box = showResult("");
+              box.className = "result-box ok";
+              var h = document.createElement("h3");
+              h.textContent = "解析成功";
+              box.appendChild(h);
+              var grid = document.createElement("div");
+              grid.className = "meta-grid";
+              grid.appendChild(metaItem("标题", info.title));
+              grid.appendChild(metaItem("作者", info.uploader));
+              grid.appendChild(metaItem("平台", (j.platform && j.platform.name) || "—"));
+              grid.appendChild(metaItem("时长", fmtDuration(info.duration)));
+              grid.appendChild(metaItem("最高分辨率", (info.width && info.height) ? (info.width + " × " + info.height) : "—"));
+              box.appendChild(grid);
+
+              var formats = info.formats || [];
+              if (formats.length) {
+                var fwrap = document.createElement("div");
+                fwrap.className = "formats";
+                formats.forEach(function (f, idx) {
+                  var row = document.createElement("div");
+                  row.className = "f-row";
+                  var res = document.createElement("span");
+                  res.className = "f-res";
+                  res.textContent = f.height ? (f.height + "p") : (f.note || "视频");
+                  row.appendChild(res);
+                  if (idx === 0) {
+                    var best = document.createElement("span");
+                    best.className = "f-best";
+                    best.textContent = "最高画质";
+                    row.appendChild(best);
+                  }
+                  var dim = document.createElement("span");
+                  dim.className = "f-dim";
+                  var parts = [];
+                  if (f.width && f.height) parts.push(f.width + "×" + f.height);
+                  if (f.fps) parts.push(f.fps + " fps");
+                  if (f.ext) parts.push(String(f.ext).toUpperCase());
+                  if (f.vcodec) parts.push(f.vcodec);
+                  if (f.acodec && f.acodec !== "none") parts.push("含音频");
+                  dim.textContent = parts.join(" · ");
+                  row.appendChild(dim);
+                  var sz = document.createElement("span");
+                  sz.className = "f-size";
+                  sz.textContent = fmtSize(f.filesize);
+                  row.appendChild(sz);
+                  fwrap.appendChild(row);
+                });
+                box.appendChild(fwrap);
+                var tip = document.createElement("p");
+                tip.style.marginTop = "12px";
+                tip.textContent = "点「下载视频」就会按你选的画质档下载（默认最高一档）。";
+                box.appendChild(tip);
+              }
+            })
+            .catch(function (e) {
+              if (e && (e.name === "TypeError" || e.name === "AbortError")) {
+                showError("解析失败", backendUnreachableMsg("解析"), true);
+              } else {
+                showError("解析失败", (e && e.message) || "未知错误", false);
+              }
+            })
+            .finally(function () { state.busy = false; refresh(); });
+        });
+
+        downloadBtn.addEventListener("click", function () {
+          if (!state.url || !state.confirmed) return;
+          state.busy = true; refresh();
+          showBusy("正在下载并合并…");
+          postJson("/api/download", { text: shareText.value, quality: state.quality, confirmed: true })
+            .then(function (j) {
+              var box = showResult("");
+              box.className = "result-box ok";
+              var h = document.createElement("h3");
+              h.textContent = "下载完成";
+              box.appendChild(h);
+              var grid = document.createElement("div");
+              grid.className = "meta-grid";
+              grid.appendChild(metaItem("标题", j.title));
+              grid.appendChild(metaItem("作者", j.uploader));
+              grid.appendChild(metaItem("文件大小", fmtSize(j.bytes)));
+              grid.appendChild(metaItem("出处记录", j.metadata_file || "—"));
+              box.appendChild(grid);
+              if (j.watermark_note) {
+                var note = document.createElement("p");
+                note.textContent = j.watermark_note;
+                box.appendChild(note);
+              }
+              if (j.download_url) {
+                var a = document.createElement("a");
+                a.className = "dl-big";
+                a.href = apiBase() + encodeURI(j.download_url);
+                a.setAttribute("download", "");
+                a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>';
+                a.appendChild(document.createTextNode("保存视频：" + (j.file || "video.mp4")));
+                box.appendChild(a);
+              }
+            })
+            .catch(function (e) {
+              if (e && (e.name === "TypeError" || e.name === "AbortError")) {
+                showError("下载失败", backendUnreachableMsg("下载"), true);
+              } else {
+                showError("下载失败", (e && e.message) || "未知错误", false);
+              }
+            })
+            .finally(function () { state.busy = false; refresh(); });
+        });
+
+        /* ---------- 初始化 ---------- */
+        refresh();
+        checkHealth(true);
+      })();
+    </script>
+  </body>
 </html>

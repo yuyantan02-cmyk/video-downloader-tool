@@ -44,7 +44,10 @@ def _yt_dlp_cmd() -> list[str]:
 def _safe_filename(name: str, max_len: int = 80) -> str:
     name = re.sub(r'[\\/:*?"<>|]+', "_", name or "video").strip()
     name = re.sub(r"\s+", "_", name)
-    return name[:max_len].strip("_") or "video"
+    # Collapse runs of dots ("..." from truncated titles) so the
+    # resulting filename never contains "..".
+    name = re.sub(r"\.{2,}", "_", name)
+    return name[:max_len].strip("_").strip(".") or "video"
 
 
 def parse_url(raw_text: str) -> dict:

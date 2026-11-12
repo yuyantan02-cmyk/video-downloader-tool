@@ -1,3 +1,9 @@
-fastapi>=0.110
-uvicorn[standard]>=0.29
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
 yt-dlp>=2024.0
+# Pin anyio to a version that does not require typing_extensions.sentinel.
+# Newer anyio (>=4.12) fails on some systems with:
+#   NameError: name 'sentinel' is not defined
+# in anyio/_core/_typedattr.py, when typing_extensions is old.
+anyio==4.9.0
+typing_extensions>=4.12.2
