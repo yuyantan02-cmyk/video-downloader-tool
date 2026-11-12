@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: video-downloader-tool
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health

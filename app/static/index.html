@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>社交视频下载器</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; line-height: 1.6; color: #222; }
+  h1 { font-size: 24px; }
+  textarea, select { width: 100%; padding: 10px; font-size: 15px; margin: 8px 0; }
+  button { padding: 10px 18px; font-size: 15px; cursor: pointer; }
+  .note { background: #f6f6f6; border-left: 4px solid #888; padding: 10px 12px; font-size: 14px; }
+  #out { white-space: pre-wrap; background: #111; color: #eee; padding: 12px; margin-top: 16px; font-size: 13px; }
+  label { font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>社交视频下载器</h1>
+<p>粘贴一个视频分享链接，工具会解析并下载平台提供的最高画质源流。只取干净源流，不涂抹、不做 AI 去水印。</p>
+
+<div class="note">
+  合规提醒：仅用于你本人上传的内容、已获得权利人授权的内容，或平台允许公开下载的内容。下载后请保留作者信息，不要二次分发。私密 / 需登录 / DRM 保护的视频不会下载。
+</div>
+
+<textarea id="text" rows="3" placeholder="粘贴分享链接，例如 https://www.youtube.com/watch?v=..."></textarea>
+<label>画质
+  <select id="quality">
+    <option value="best">最高画质</option>
+    <option value="1080p">最高 1080p</option>
+    <option value="720p">最高 720p（文件更小）</option>
+  </select>
+</label>
+<p><label><input type="checkbox" id="confirmed"> 我确认：这是我本人上传的内容，或已获得权利人授权，或属于可公开下载的内容。</label></p>
+<p>
+  <button id="parseBtn">1. 解析</button>
+  <button id="dlBtn">2. 下载</button>
+</p>
+<div id="out">等待操作…</div>
+
+<script>
+const out = document.getElementById('out');
+function show(x){ out.textContent = typeof x === 'string' ? x : JSON.stringify(x, null, 2); }
+async function post(path, body){
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+document.getElementById('parseBtn').onclick = async () => {
+  try { show('解析中…'); const j = await post('/api/parse', {text: document.getElementById('text').value}); show(j); }
+  catch(e){ show('解析失败：' + e.message); }
+};
+document.getElementById('dlBtn').onclick = async () => {
+  try {
+    show('下载中，请稍等…');
+    const j = await post('/api/download', {text: document.getElementById('text').value, quality: document.getElementById('quality').value, confirmed: document.getElementById('confirmed').checked});
+    show(j);
+    if(j.download_url){ const a = document.createElement('a'); a.href = j.download_url; a.textContent = '下载视频：' + j.file; a.style.display='block'; a.style.marginTop='12px'; out.appendChild(a); }
+  } catch(e){ show('下载失败：' + e.message); }
+};
+</script>
+</body>
+</html>
