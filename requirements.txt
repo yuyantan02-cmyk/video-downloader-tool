@@ -5,6 +5,9 @@ uvicorn[standard]==0.34.0
 # response ("Failed to extract any player response"). Pinning forces a
 # fresh install whenever the version changes.
 yt-dlp==2026.10.26
+yt-dlp-ejs==0.8.0
+deno==2.9.8
+pycryptodomex==3.23.0
 # Pin anyio to a version that does not require typing_extensions.sentinel.
 # Newer anyio (>=4.12) fails on some systems with:
 #   NameError: name 'sentinel' is not defined

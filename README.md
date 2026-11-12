@@ -1,88 +1,83 @@
-# 社交视频下载器 Social Video Downloader
+# Social Video Downloader
 
-粘贴一个社交平台的视频链接，下载平台提供的最高画质源流。
+现有 FastAPI + yt-dlp + Web/CLI 项目的七平台适配升级分支。保留网页布局、解析与下载接口及 Render Docker 架构。
 
-> **定位：** 仅用于你本人上传的内容、已获得权利人授权的内容，或可公开下载的内容。详见 [COMPLIANCE.md](COMPLIANCE.md)。
->
-> 工具只取平台提供的干净源流，不涂抹、不做 AI 去水印。私密 / 需登录 / DRM 保护的视频会直接拒绝。
+**当前是待真实下载验收的开发版本，不宣称七个平台全部可下载。** 用户选择自行完成授权样例验收；自动化合成测试不能替代真实平台成功。详见 [验收矩阵与阶段报告](docs/acceptance.md)。
 
-## 支持的平台
+## 平台范围
 
-| 平台 | 状态 |
-|---|---|
-| YouTube、TikTok、X、Instagram、Threads | yt-dlp 核心，效果最稳（YouTube 走网页/安卓/电视/苹果端自动切换，绕过机器人验证） |
-| 快手 | 专用解析：手机分享页里直接取无水印 MP4 直链，不用登录 |
-| Bilibili | yt-dlp，公开视频；下载偶尔被 CDN 拒绝（HTTP 567）时重试即可 |
-| 抖音、小红书、Facebook | 平台要求登录/验证，工具不登录所以取不到，请用 App 官方保存/导出 |
-| 微信视频号 | 需要本人在官方客户端登录，工具不直接取，请用官方导出 |
+| 平台 | 实现路径 | 已知边界 | 真实下载验收 |
+|---|---|---|---|
+| 抖音 | 标准/短链/分享文案；公开页面 hydration + yt-dlp Douyin | 验证页会停止，不生成验证 Cookie | BLOCKED（本次样例需验证） |
+| Facebook | yt-dlp；补 watch/reel 等识别及错误分类 | 登录、验证、不可访问、解析器、网络分别报错 | PASS（单个授权样例；公开 DNS 测试进程） |
+| YouTube | yt-dlp + 匹配的 EJS/Deno；分离音视频用 FFmpeg 无损合并 | 不切换客户端规避拒绝，不处理付费/私密/DRM | PASS（单个授权样例；公开 DNS 测试进程） |
+| Threads | 当前帖子公开 JSON 中的视频版本，跳过图片 | 多视频帖子只保存第一段，显示视频数和说明；不取推荐帖视频 | NOT TESTED |
+| Bilibili | BV、b23.tv 短链 + yt-dlp + FFmpeg | 不绕过会员画质/付费；CDN 错误分类，有限重试 | NOT TESTED |
+| 小红书 | xhslink.com/.cn 跳转、必要查询参数、yt-dlp 笔记解析 | 区分图片笔记与访问验证；不导入登录态 | BLOCKED（本次样例跳转登录） |
+| 微信视频号 | 识别后返回 official_export_required | 未取得通用授权下载接口依据，不伪造解析成功 | BLOCKED |
+| TikTok、X、Instagram | 保留 yt-dlp 路径 | 仍需真实回归验收 | NOT TESTED |
+| 快手 | 保留手机分享页解析，媒体交给统一安全下载流程 | 直链分辨率未知时仅支持 best，作者可能未知 | NOT TESTED |
 
-小红书：App 里复制的、带 xsec_token 的完整分享链接成功率更高，正在验证中。
+所有未逐文件检查的视频都显示水印状态 **未验证**。不做 AI、裁剪、模糊或覆盖去水印；原生视频地址不等于已验证无水印。文件下载后用 ffprobe 测量分辨率、编码、时长和音频流；是否完整播放仍需验收。
 
-## 快速开始
+## 使用
 
-需要 Python 3.10+ 和 ffmpeg。
+公网用户直接使用已部署的网站，无需安装 Python。**开发分支尚未部署，当前生产网站不会自动获得本分支修改。**
 
-```bash
-git clone https://github.com/yuyantan02-cmyk/video-downloader-tool.git
-cd video-downloader-tool
-python3 -m venv .venv && source .venv/bin/activate
+本地开发使用 Python 3.12（最低 3.11）、FFmpeg 和 ffprobe：
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# 网页版
-uvicorn app.main:app --host 127.0.0.1 --port 8000
-# 打开 http://127.0.0.1:8000
-
-# 命令行版（只解析不下载）
-python cli.py "https://www.youtube.com/watch?v=..." --info-only
-
-# 命令行版（下载，必须加 --confirm）
-python cli.py "https://www.youtube.com/watch?v=..." --confirm --quality best
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --no-access-log
 ```
 
-下载的文件在 `downloads/`，旁边会有一个同名 `.json`，保存标题、作者、原链接。
+依赖中包含固定版本 yt-dlp、匹配的 EJS、Deno 和 HLS 所需的加密库；不允许远程临时拉取执行组件。Docker 已安装 FFmpeg/ffprobe，无需公网用户手动安装。
 
-## 公开部署（零成本，推荐：Render 一体部署）
-
-不用 GitHub Pages。FastAPI 本身就在 `/` 提供网页，所以一个 Render 服务就同时是前端 + 后端，打开一个网址就能用。
-
-1. 把代码推到 GitHub：
-```bash
-gh repo create video-downloader-tool --public --source=. --push
+```sh
+python cli.py 'https://www.youtube.com/watch?v=YOUR_VIDEO' --info-only
+python cli.py 'https://www.youtube.com/watch?v=YOUR_VIDEO' --confirm --quality best
 ```
-2. 打开 https://dashboard.render.com ，用 GitHub 账号登录。
-3. New → Web Service → 选择 `video-downloader-tool` 这个仓库。Render 会自动读仓库里的 `render.yaml`（已写好 `plan: free`，免费版）。
-4. 点 Deploy，等构建完成，会得到一个网址，形如 `https://video-downloader-tool.onrender.com`。
-5. 打开那个网址，粘贴链接就能下载。不用再填后端地址。
 
-注意：Render 免费版 15 分钟没人用会休眠，第一次打开要等 30-60 秒唤醒。
+CLI 本人主动保存的文件与出处保留在 downloads，不参与 Web 文件的过期删除；旧版已有文件也不会被自动删除。
 
-## Docker
+## API 兼容与限制
 
-```bash
+保留 `GET /health`、`POST /api/parse`、`POST /api/download`、`GET /files/{filename}`，保留原有请求/成功字段。新增 `/api/platforms`、结构化错误 `code`、封面、水印状态、实测媒体信息、`metadata_url`。
+
+**文件访问安全变化：** `/files/{filename}` 现在需要返回链接中的 token。客户端必须直接使用 `download_url`，不能丢弃查询参数再拼文件名。旧文件无访问令牌时不公开回传。默认有效一小时；重启后旧链接失效。
+
+- 每实例单 Uvicorn worker，同时一个解析/下载任务；繁忙返回 429。
+- 解析上限 120 秒，下载上限 600 秒；网页等待略长于服务端上限。
+- 每任务临时文件总量与最终文件各限 512 MiB（合并时输入输出都会计入临时空间），10 MiB/s，分片串行。
+- Linux 上监测子进程组 RSS，默认 320 MiB 上限；轮询检查是资源保护，不是操作系统级隔离。
+- Web 文件默认一小时过期，服务每分钟清理本版本带管理标记的过期文件；失败只清理本任务临时目录。
+- DNS 与每次连接拒绝本机、内网、保留地址，连接使用已检查的数值 IP；重定向同样受约束。媒体网络下载只允许 Python 原生下载器，禁止静默回退到联网 FFmpeg。FFmpeg 仅处理本地文件。
+- 不导入用户 yt-dlp 配置、账号 Cookie 或插件，不持久保存登录态；不返回上游签名媒体地址或原始错误日志。
+- 默认同源及本仓库所有者的 `https://yuyantan02-cmyk.github.io` 来源。其他独立静态前端需在 `ALLOWED_ORIGINS` 填写明确来源，以逗号分隔；不使用通配符。
+
+## Render / Docker
+
+继续使用仓库 `Dockerfile`、`render.yaml` 和 `docker-compose.yml`。镜像以非 root 用户运行，单 worker，关闭含文件凭证的访问日志；Compose 默认只绑定本机。
+
+```sh
 docker compose up --build
-# 打开 http://127.0.0.1:8000
 ```
 
-## 项目结构
+Render 新建测试服务或 Blueprint 时选择本开发分支，**不要直接把生产服务改到此分支**。本次交付不合并 main、不部署生产。健康接口 `ready` 检查 FFmpeg/ffprobe/Deno/EJS 是否可用；它不证明平台可下载。Render 默认临时磁盘，重启、重新部署、休眠可能丢失尚未保存到用户设备的文件；免费实例有内存/带宽/休眠限制，不承诺长期零成本商用。
 
-```
-app/
-  main.py        # FastAPI：解析 / 下载 / 文件回传
-  downloader.py  # yt-dlp 封装：最高画质 bv*+ba；快手走 app/kuaishou.py 专用解析
-  platforms.py   # 平台识别（只按 URL 正则，不碰账号）
-  static/index.html  # 简单网页：粘贴链接、选画质、勾选确认
-cli.py           # 命令行入口
-tests/           # 平台识别的单元测试（不联网）
-COMPLIANCE.md    # 合规说明，必读
+可配置：`MAX_DOWNLOAD_BYTES`、`MAX_WORKER_MEMORY_MB`、`PARSE_TIMEOUT_SECONDS`、`DOWNLOAD_TIMEOUT_SECONDS`、`DOWNLOAD_TTL_SECONDS`、`ALLOWED_ORIGINS`。这些是服务保护参数，调大前应核实实例资源。
+
+## 测试
+
+```sh
+pip install -r requirements-dev.txt
+python -m pytest -q
 ```
 
-## 常见问题
+测试包括原有链接测试、安全/重定向/权限/超时/API/CLI/平台页面合成夹具，以及真实本地合成媒体的 FFmpeg 合并和 ffprobe 检查。运行媒体测试需要 ffmpeg/ffprobe。GitHub Actions 另构建镜像并检查容器依赖及健康；不执行未授权的平台视频下载。
 
-- **画质只有 720p？** 先看解析结果里的格式列表。YouTube 高清是视频流 + 音频流分开的，工具已用 `bv*+ba` 合并；如果平台本身最高就是 720p，那就是平台给的上限。
-- **提示需要登录？** 说明是私密 / 需登录内容，工具不会用账号去取，请用官方导出。
-- **水印还在？** 说明水印已烧进原片，或平台这次没给干净流。工具不会涂抹去水印，会如实返回原样。
-- **解析突然失效？** 平台改接口了，先升级：`pip install -U yt-dlp`，不行就等专用解析器更新。
+## 使用与许可
 
-## License
-
-MIT，见 LICENSE。
+仅用于本人上传、获得授权或平台明确允许下载的内容。可公开访问不等于获准下载或商用。见 [COMPLIANCE.md](COMPLIANCE.md)。代码许可为 MIT，不授予任何平台内容或自动化访问许可。

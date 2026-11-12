@@ -5,3 +5,12 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: "https://yuyantan02-cmyk.github.io"
+      - key: MAX_DOWNLOAD_BYTES
+        value: "536870912"
+      - key: DOWNLOAD_TTL_SECONDS
+        value: "3600"
+      - key: MAX_WORKER_MEMORY_MB
+        value: "320"

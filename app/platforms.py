@@ -7,6 +7,18 @@ the downloader returns a clear error instead of trying cookies.
 from __future__ import annotations
 
 import re
+from urllib.parse import urlsplit
+
+HOSTS = {
+    'youtube': ('youtube.com', 'youtu.be'),
+    'tiktok': ('tiktok.com',), 'instagram': ('instagram.com', 'instagr.am'),
+    'facebook': ('facebook.com', 'fb.watch', 'fb.com'),
+    'x': ('twitter.com', 'x.com', 't.co'), 'threads': ('threads.net', 'threads.com'),
+    'douyin': ('douyin.com', 'iesdouyin.com'),
+    'xiaohongshu': ('xiaohongshu.com', 'xhslink.com', 'xhslink.cn'),
+    'wechat': ('weixin.qq.com',), 'bilibili': ('bilibili.com', 'b23.tv'),
+    'kuaishou': ('kuaishou.com', 'chenzhongtech.com'),
+}
 
 # (platform key, display name, URL patterns, notes)
 PLATFORMS = [
@@ -27,6 +39,7 @@ PLATFORMS = [
     ("facebook", "Facebook", [
         r"facebook\.com/.*/(videos|reel|watch)",
         r"facebook\.com/share/",
+        r"facebook\.com/(watch|reel|videos)/?",
         r"fb\.watch/",
         r"fb\.com/",
     ], "Public videos only; Facebook often requires login to view video details from a server IP."),
@@ -42,16 +55,17 @@ PLATFORMS = [
         r"douyin\.com/video/\d+",
         r"v\.douyin\.com/",
         r"iesdouyin\.com/",
-    ], "抖音要浏览器验证 cookie 才能拿到视频地址，工具不登录、不存 cookie，所以取不到；请用抖音 App 官方保存/导出。"),
+        r"douyin\.com/\?[^\s]*modal_id=\d+",
+    ], "尝试公开分享页与 yt-dlp；遇到访问验证即停止，需真实链接验收。"),
     ("xiaohongshu", "小红书", [
         r"xiaohongshu\.com/",
         r"xhslink\.com/",
         r"xhslink\.cn/",
-    ], "有 yt-dlp 提取器，但小红书常对服务器 IP 回“笔记暂时无法浏览”，要登录/验证；带 xsec_token 的完整分享链接成功率更高。"),
+    ], "保留分享链接必要参数；仅视频笔记，访问验证或图片笔记会明确报错。"),
     ("wechat", "微信视频号", [
         r"weixin\.qq\.com/sph/",
         r"channels\.weixin\.qq\.com/",
-    ], "要登录后的 token 才能拿到视频地址，工具不登录所以取不到；请用微信 / 视频号助手官方导出。"),
+    ], "尚未确认通用授权下载接口；请在官方客户端或视频号助手检查本人作品的导出方式。"),
     ("bilibili", "Bilibili", [
         r"bilibili\.com/video/",
         r"b23\.tv/",
@@ -59,20 +73,27 @@ PLATFORMS = [
     ("kuaishou", "快手", [
         r"kuaishou\.com/",
         r"v\.kuaishou\.com/",
-    ], "专用解析：手机分享页里直接给无水印 MP4 直链，不用登录。"),
+        r"chenzhongtech\.com/fw/photo/",
+    ], "手机公开分享页直链；仅最高档，水印未验证，作者与画质可能未知。"),
 ]
-
-_GENERIC_PATTERNS = [
-    r"https?://\S+",
-]
-
 
 def detect_platform(url: str) -> dict | None:
     """Return platform info for a URL, or None if unknown."""
     url = (url or "").strip()
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or '').lower().rstrip('.')
+        if parts.scheme not in ('http', 'https') or parts.username is not None or parts.password is not None:
+            return None
+        if parts.port not in (None, 80 if parts.scheme == 'http' else 443):
+            return None
+    except ValueError:
+        return None
     for key, name, patterns, notes in PLATFORMS:
+        if not any(host == domain or host.endswith('.' + domain) for domain in HOSTS[key]):
+            continue
         for pat in patterns:
-            if re.search(pat, url, re.IGNORECASE):
+            if re.search(pat, host + parts.path + ('?' + parts.query if parts.query else ''), re.IGNORECASE):
                 return {"key": key, "name": name, "notes": notes}
     return None
 
@@ -85,4 +106,4 @@ def extract_url(text: str) -> str | None:
     if not m:
         return None
     # Strip trailing punctuation that is often part of share text.
-    return m.group(0).rstrip(".,;!?)")
+    return m.group(0).rstrip(".,;!?)。，；！、）】")

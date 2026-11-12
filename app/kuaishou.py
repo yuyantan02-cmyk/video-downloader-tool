@@ -19,6 +19,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from .network import open_public
 
 MOBILE_UA = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
@@ -39,12 +40,12 @@ def _http_get(url: str, timeout: int = 30) -> tuple[str, str]:
         "Accept-Language": "zh-CN,zh;q=0.9",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        body = resp.read().decode("utf-8", errors="ignore")
+    with open_public(req, timeout=timeout) as resp:
+        body = resp.read(4 * 1024 * 1024).decode("utf-8", errors="ignore")
         return resp.geturl(), body
 
 
-def extract_photo_id(url: str) -> str | None:
+def extract_photo_id(url: str, remaining: int = 5) -> str | None:
     """Get the photoId from any Kuaishou link shape, following redirects."""
     url = (url or "").strip()
     m = re.search(r"/short-video/([A-Za-z0-9]+)", url)
@@ -57,11 +58,15 @@ def extract_photo_id(url: str) -> str | None:
     if m:
         return m.group(1)
     # Short links (v.kuaishou.com/..., /f/...) redirect to the photo page.
+    if remaining <= 0:
+        return None
     try:
         final_url, _ = _http_get(url, timeout=20)
     except Exception:
         return None
-    return extract_photo_id(final_url)
+    if final_url == url:
+        return None
+    return extract_photo_id(final_url, remaining - 1)
 
 
 def _pick_video_url(html: str) -> str | None:
