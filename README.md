@@ -65,6 +65,8 @@ CLI 本人主动保存的文件与出处保留在 downloads，不参与 Web 文�
 docker compose up --build
 ```
 
+Compose 使用命名卷承接非 root 用户的临时下载，避免宿主目录 UID 不匹配；原宿主 `downloads/` 不会删除或迁移。网页仍使用保存链接，CLI 仍保存到本机 `downloads/`。
+
 Render 新建测试服务或 Blueprint 时选择本开发分支，**不要直接把生产服务改到此分支**。本次交付不合并 main、不部署生产。健康接口 `ready` 检查 FFmpeg/ffprobe/Deno/EJS 是否可用；它不证明平台可下载。Render 默认临时磁盘，重启、重新部署、休眠可能丢失尚未保存到用户设备的文件；免费实例有内存/带宽/休眠限制，不承诺长期零成本商用。
 
 可配置：`MAX_DOWNLOAD_BYTES`、`MAX_WORKER_MEMORY_MB`、`PARSE_TIMEOUT_SECONDS`、`DOWNLOAD_TIMEOUT_SECONDS`、`DOWNLOAD_TTL_SECONDS`、`ALLOWED_ORIGINS`。这些是服务保护参数，调大前应核实实例资源。
