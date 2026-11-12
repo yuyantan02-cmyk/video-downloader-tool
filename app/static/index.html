@@ -372,13 +372,13 @@
       <!-- ================= 工具 ================= -->
       <div class="hero">
         <h1>粘贴视频链接，<br />拿回<span class="hl">原画质</span>的视频文件</h1>
-        <p>把任意平台的分享链接贴进来 —— <b>YouTube、TikTok、抖音、X、Instagram、Facebook、Threads、小红书、Bilibili、快手</b>都行。工具只取平台本来就存着的干净源流，不涂抹、不做 AI 去水印；水印如果已经烧进原片，会如实保留并告诉你。</p>
+        <p>把任意平台的分享链接贴进来 —— <b>TikTok、X、Instagram、快手</b>都行。工具只取平台本来就存着的干净源流，不涂抹、不做 AI 去水印；水印如果已经烧进原片，会如实保留并告诉你。</p>
       </div>
 
       <div class="tool" id="tool">
         <label class="field-label" for="shareText">视频链接 / 整段分享文案</label>
         <div class="paste-row">
-          <textarea id="shareText" rows="3" placeholder="把分享文案整段贴进来也可以，工具会自动挑出里面的链接。例如：https://www.youtube.com/watch?v=…"></textarea>
+          <textarea id="shareText" rows="3" placeholder="把分享文案整段贴进来也可以，工具会自动挑出里面的链接。例如：https://www.tiktok.com/t/ZPLW18c3s/"></textarea>
         </div>
         <div class="paste-actions">
           <button type="button" class="mini-btn" id="pasteBtn">
@@ -393,7 +393,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="currentColor" stroke="none"/></svg>
             填入示例链接
           </button>
-          <span class="example-note">示例是 YouTube 上第一支视频《Me at the zoo》，公开可下载。</span>
+          <span class="example-note">示例是一条 TikTok 公开视频。</span>
         </div>
 
         <div class="detect" id="detectBox" aria-live="polite">
@@ -413,7 +413,7 @@
               <button type="button" data-quality="1080p" aria-pressed="false">≤ 1080p</button>
               <button type="button" data-quality="720p" aria-pressed="false">≤ 720p</button>
             </div>
-            <div class="seg-hint">最高画质 = 平台给的上限。YouTube 高清是音视频分离的，工具会自动合并成 MP4。</div>
+            <div class="seg-hint">最高画质 = 平台给的上限。</div>
           </div>
           <div>
             <span class="group-label">下载确认</span>
@@ -493,7 +493,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
       <!-- ================= 支持平台 ================= -->
       <section class="block">
         <h2>支持的平台</h2>
-        <p class="lede">分三档，是按实际能下到的程度标的，不按宣传标：核心档走 yt-dlp 最稳；兜底档能下，但平台改接口时可能暂时失效，升级 yt-dlp 通常就恢复；视频号必须本人在官方客户端里操作，工具不碰登录态。</p>
+        <p class="lede">按实际能下到的程度标的，不按宣传标：核心档走 yt-dlp 最稳；快手是专用解析取直链。</p>
         <div class="plat-grid" id="platGrid"></div>
       </section>
 
@@ -504,7 +504,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
         <div class="steps">
           <div class="step"><div class="num">01</div><h3>识别链接</h3><p>从整段分享文案里挑出真正的链接，按域名判断是哪个平台，短链也认。</p></div>
           <div class="step"><div class="num">02</div><h3>实时解析</h3><p>后端用 yt-dlp 现查这个视频的全部画质档位。必须现查 —— 播放地址带签名，缓存的旧地址很快过期。</p></div>
-          <div class="step"><div class="num">03</div><h3>取干净源流</h3><p>默认选最高一档；TikTok 明确向平台要无水印源流，YouTube 把分离的音视频用 ffmpeg 合成一个 MP4。</p></div>
+          <div class="step"><div class="num">03</div><h3>取干净源流</h3><p>默认选最高一档；TikTok 明确向平台要无水印源流。</p></div>
           <div class="step"><div class="num">04</div><h3>校验并附出处</h3><p>下完校验文件完整性，旁边生成一个同名 .json，记着标题、作者和原链接，署名不丢。</p></div>
         </div>
       </section>
@@ -530,11 +530,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
         </details>
         <details class="faq">
           <summary>昨天还能解析，今天突然失败了？</summary>
-          <p>大概率是平台又改接口了，这是这类工具最常见的故障。先在后端环境里运行 <code>pip install -U yt-dlp</code> 升级解析引擎，多数情况就恢复了；抖音、小红书这类平台偶尔要等专用解析器更新。</p>
-        </details>
-        <details class="faq">
-          <summary>微信视频号为什么不能直接下？</summary>
-          <p>视频号的视频基本都要登录态才能拿到，绕开登录去取既不稳定也不合规，所以工具只识别、不抓取。请在微信官方客户端里用官方方式保存你自己的视频号作品。</p>
+          <p>大概率是平台又改接口了，这是这类工具最常见的故障。先在后端环境里运行 <code>pip install -U yt-dlp</code> 升级解析引擎，多数情况就恢复了；个别平台偶尔要等专用解析器更新。</p>
         </details>
       </section>
 
@@ -556,39 +552,18 @@ https://video-downloader-tool-5ffe.onrender.com</div>
 
         /* ---------- 平台数据（与后端 app/platforms.py 保持一致） ---------- */
         var PLATFORMS = [
-          { key: "youtube", name: "YouTube", color: "#ff0033", tier: "stable", tierLabel: "核心支持",
-            patterns: [/youtube\.com\/(watch|shorts|live|embed)/i, /youtu\.be\//i],
-            note: "最高画质走分离流合并，解析最稳。" },
           { key: "tiktok", name: "TikTok", color: "#161823", tier: "stable", tierLabel: "核心支持",
             patterns: [/tiktok\.com\/@[^/]+\/video\/\d+/i, /tiktok\.com\/t\//i, /vt\.tiktok\.com\//i, /vm\.tiktok\.com\//i],
             note: "会明确向平台要无水印的干净源流。" },
           { key: "instagram", name: "Instagram", color: "#e1306c", tier: "stable", tierLabel: "核心支持",
             patterns: [/instagram\.com\/(reel|reels|p|stories)\//i, /instagr\.am\//i],
             note: "仅公开帖子 / Reels，需登录的会拒绝。" },
-          { key: "facebook", name: "Facebook", color: "#1877f2", tier: "stable", tierLabel: "核心支持",
-            patterns: [/facebook\.com\/.*\/(videos|reel|watch)/i, /facebook\.com\/share\//i, /fb\.watch\//i, /fb\.com\//i],
-            note: "仅公开视频；Facebook 常要求登录，服务器上部分视频打不开。" },
           { key: "x", name: "X", color: "#000000", tier: "stable", tierLabel: "核心支持",
             patterns: [/(twitter|x)\.com\/[^/]+\/status\/\d+/i, /t\.co\//i],
             note: "仅公开帖子里的视频。" },
-          { key: "threads", name: "Threads", color: "#000000", tier: "stable", tierLabel: "核心支持",
-            patterns: [/threads\.net\/@[^/]+\/post\//i, /threads\.com\/@[^/]+\/post\//i],
-            note: "仅公开帖子里的视频。" },
-          { key: "douyin", name: "抖音", color: "#161823", tier: "ytdlp", tierLabel: "yt-dlp 兜底",
-            patterns: [/douyin\.com\/video\/\d+/i, /v\.douyin\.com\//i, /iesdouyin\.com\//i],
-            note: "抖音要浏览器验证 cookie，工具不登录所以取不到，请用 App 保存/导出。" },
-          { key: "xiaohongshu", name: "小红书", color: "#ff2442", tier: "ytdlp", tierLabel: "yt-dlp 兜底",
-            patterns: [/xiaohongshu\.com\//i, /xhslink\.com\//i, /xhslink\.cn\//i],
-            note: "小红书常对服务器回“笔记暂时无法浏览”，要登录/验证；带 xsec_token 的分享链接成功率更高。" },
-          { key: "bilibili", name: "Bilibili", color: "#00a1d6", tier: "ytdlp", tierLabel: "yt-dlp 兜底",
-            patterns: [/bilibili\.com\/video\//i, /b23\.tv\//i],
-            note: "仅公开视频；大会员专享画质拿不到。" },
           { key: "kuaishou", name: "快手", color: "#ff4906", tier: "stable", tierLabel: "专用解析",
             patterns: [/kuaishou\.com\//i, /v\.kuaishou\.com\//i],
-            note: "专用解析取直链，不用登录。" },
-          { key: "wechat", name: "微信视频号", color: "#07c160", tier: "official", tierLabel: "官方导出",
-            patterns: [/weixin\.qq\.com\/sph\//i, /channels\.weixin\.qq\.com\//i],
-            note: "视频号需要本人在官方客户端登录操作，工具只识别、不抓取，请用官方导出。" }
+            note: "专用解析取直链，不用登录。" }
         ];
 
         function extractUrl(text) {
@@ -692,12 +667,10 @@ https://video-downloader-tool-5ffe.onrender.com</div>
             detectUrl.appendChild(document.createTextNode(state.url));
           }
 
-          var isWechat = state.platform && state.platform.key === "wechat";
-          parseBtn.disabled = state.busy || !state.url || isWechat;
-          downloadBtn.disabled = state.busy || !state.url || !state.confirmed || isWechat;
+          parseBtn.disabled = state.busy || !state.url;
+          downloadBtn.disabled = state.busy || !state.url || !state.confirmed;
 
           if (!state.url) whyDisabled.textContent = "先粘贴一个链接。";
-          else if (isWechat) whyDisabled.textContent = "视频号请用微信官方客户端导出，工具不抓取。";
           else if (!state.confirmed) whyDisabled.textContent = "链接已就绪，点一下右边的下载确认就能下载；解析不需要确认。";
           else whyDisabled.textContent = "可以下载了。若后端还没启动，下载会提示连不上，按下方 A 的步骤启动即可。";
 
@@ -720,7 +693,7 @@ https://video-downloader-tool-5ffe.onrender.com</div>
           shareText.focus();
         });
         document.getElementById("exampleBtn").addEventListener("click", function () {
-          shareText.value = "https://www.youtube.com/watch?v=jNQXAC9IVRw";
+          shareText.value = "https://www.tiktok.com/t/ZPLW18c3s/";
           result.className = "result";
           result.innerHTML = "";
           refresh();

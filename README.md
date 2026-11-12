@@ -6,15 +6,17 @@
 >
 > 工具只取平台提供的干净源流，不涂抹、不做 AI 去水印。私密 / 需登录 / DRM 保护的视频会直接拒绝。
 
-## 支持的平台（MVP）
+## 支持的平台
 
 | 平台 | 状态 |
 |---|---|
-| YouTube、TikTok、X、Instagram、Facebook、Threads | yt-dlp 核心，效果最稳 |
-| 抖音、小红书、快手、Bilibili | MVP 走 yt-dlp，专用解析器是第二阶段 |
-| 微信视频号 | 需要本人在官方客户端登录，MVP 不直接取，请用官方导出 |
+| YouTube、TikTok、X、Instagram、Threads | yt-dlp 核心，效果最稳（YouTube 走网页/安卓/电视/苹果端自动切换，绕过机器人验证） |
+| 快手 | 专用解析：手机分享页里直接取无水印 MP4 直链，不用登录 |
+| Bilibili | yt-dlp，公开视频；下载偶尔被 CDN 拒绝（HTTP 567）时重试即可 |
+| 抖音、小红书、Facebook | 平台要求登录/验证，工具不登录所以取不到，请用 App 官方保存/导出 |
+| 微信视频号 | 需要本人在官方客户端登录，工具不直接取，请用官方导出 |
 
-国内平台接口变化快，专用解析器见 `docs/roadmap.md`（计划中）。
+小红书：App 里复制的、带 xsec_token 的完整分享链接成功率更高，正在验证中。
 
 ## 快速开始
 
@@ -66,7 +68,7 @@ docker compose up --build
 ```
 app/
   main.py        # FastAPI：解析 / 下载 / 文件回传
-  downloader.py  # yt-dlp 封装：最高画质 bv*+ba，TikTok 用 --no-watermark 取干净流
+  downloader.py  # yt-dlp 封装：最高画质 bv*+ba；快手走 app/kuaishou.py 专用解析
   platforms.py   # 平台识别（只按 URL 正则，不碰账号）
   static/index.html  # 简单网页：粘贴链接、选画质、勾选确认
 cli.py           # 命令行入口
